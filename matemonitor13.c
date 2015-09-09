@@ -87,7 +87,7 @@ long IAO_Day_Secs, IAR_Day_Secs;
 int AC1InLimit=45, BatTrgV=512, SOCstart=100;
 float BatAmpHrIn=0.0, BatAmpHrOut=0.0, BatAmpHrCrx=0.0, MaxVNegAmps=0.0,BattEffFac=0.91,ChargeDisableTrigV=51.0;
 float SellWH,BuyWH,InvWatts,InvWH, netbattamps=0.0, BatTrgAmp=0.0, MaxNegBatAmpsDropped=(-MAX_NEG_NBA_DROPPED);
-float WHtopMaxTemp=170.0,WHtopMinTemp=100.0,WHCenterMinTemp=50.0,WHmaxAnyTemp=178.0;
+float WHtopMaxTemp=170.1,WHtopMinTemp=100.0,WHCenterMinTemp=50.0,WHmaxAnyTemp=178.0;
 int ngp, invMode, selling, buying, sellv=0, invbattv=0, KBLock=0, DropSelected=0, AmpsBelowThresholdWaitSecs=5;
 int InverterPwr=0, SellVoltMin=DEFAULT_SELL_V_MIN, SellVoltMax=DEFAULT_SELL_V_MAX, UnderUtilization;
 time_t epoch_time,ResetTime;
