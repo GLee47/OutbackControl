@@ -621,7 +621,7 @@ static int pau=0;//pause for adjusting sell voltage
 	if (AdjustedSellV<SUPPORT_MODE_MIN_ADJ_SELL_VOLTS) AdjustedSellV=SUPPORT_MODE_MIN_ADJ_SELL_VOLTS;
 	if (AdjustedSellV>SUPPORT_MODE_MAX_ADJ_SELL_VOLTS) AdjustedSellV=SUPPORT_MODE_MAX_ADJ_SELL_VOLTS;
 	if ((AdjustedSellV<(int)(MaxVNegAmps*10.0))&&(DischargeAllowed!=YES)) AdjustedSellV=(int)(MaxVNegAmps*10.0);
-	WMVPRINTW(FNDCWin,6,2,"%s                       ","");
+	if (InvInputMode != GridTied) WMVPRINTW(FNDCWin,6,2,"%s                       ","");
 	if (ngp<0){Selling++;}else{Selling=0;}
 	if (FNDC_BATT_VOLTS<45){
 		cmdMate("AC1INLM","48",__LINE__);
@@ -1387,7 +1387,7 @@ void printStuff(void){
 	WMVPRINTW(FNDCWin,2,2,"Amps %5.1f %5.1f %5.1f  ",FNDC_SHUNT_A_AMPS,FNDC_SHUNT_B_AMPS,FNDC_SHUNT_C_AMPS);
 	WMVPRINTW(FNDCWin,3,2,"Net Amps%6.1f             ",netbattamps);
 	WMVPRINTW(FNDCWin,4,2,"InvOut/In %6.1f%% ",(INVPWR/((0-FNDC_SHUNT_A_AMPS)*FNDC_BATT_VOLTS))*100);
-	WMVPRINTW(FNDCWin,6,2,"ACPS %4s",acpsModeDesc[AirCondPwrSrc]);
+	if (InvInputMode != GridTied) WMVPRINTW(FNDCWin,6,2,"ACPS %4s",acpsModeDesc[AirCondPwrSrc]);
 	WMVPRINTW(FNDCWin,7,1,"MaxNegA Dropped %5.1f ",MaxNegBatAmpsDropped);
 	WMVPRINTW(FNDCWin,8,2,"KB Locked %s ",((KBLock) ? "Yes Press ^":"No Press L "));
 	WMVPRINTW(FNDCWin,10,2,"%s         ","  ");
