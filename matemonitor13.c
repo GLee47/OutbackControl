@@ -20,6 +20,7 @@
 #include <errno.h>
 #include <math.h>
 #include <unistd.h>
+#include <signal.h>
 #include <wiringPi.h>
 #include "load_control.h"
 
@@ -473,7 +474,7 @@ static long c=0L, AvHrSOC=0L;
 	if (TimeTest(22,0,0)){
 		whsSetFlags(whsTimer, whsOff);
 		WHCenterMinTemp=50.0;
-		if(WHtopMinTemp>110.0) WHtopMinTemp=100.0;
+		if(WHtopMinTemp>100.0) WHtopMinTemp=100.0;
 	}
 
 //Email Report broken on this pc
@@ -1453,9 +1454,15 @@ void IdleLoop()
 	}
 }
 
+void signalIntHandler(int signo)
+{
+	if (signo==SIGINT) terminate = true;
+}
+
 int main( int argc, char *argv[]) 
 { 
 	terminate=false;
+	if (signal(SIGINT,signalIntHandler)== SIG_ERR) return 5;
 	IAO_Day_Secs=0;
 	IAR_Day_Secs=0;
 	SellWH=0;

@@ -24,6 +24,14 @@ extern bool preferHeatPumpOn;
 #define COMPRESSOR_L2_DIFF	0
 #define AIR_COND_AMPS		6
 
+#define LE_SETPOINT_START	145
+#define	LE_DIVISOR			5
+#define UE_SETPOINT_START	130
+#define	UE_DIVISOR			8
+#define AC_SETPOINT_START	135
+#define	AC_DIVISOR			20
+
+
 #define WHMAXTEMP (WHmaxAnyTemp-(100-FNDC_SOC))
 
 #define DEFAULT_DELAY	3
@@ -360,7 +368,7 @@ void LoadControl(void)
 		//top >120 or we got more juce them bring up bottom temp
 		if((digitalRead(WH_LOWER_ELEMENT)==OFF) && (midTank != irAbove) && 
 				(((TOT_LOAD(L2)+LOWER_LV_L2_DIFF)< MAX_LOAD_AMPS) || (FNDC_BATT_VOLTS > 56.0)) && 
-				(FNDC_BATT_VOLTS > MAX(50.8 + MAX(0,((TEMPSENSOR(CENTER_LEFT)-135)/15)),fSellV+0.4)))
+				(FNDC_BATT_VOLTS > MAX(50.8 + MAX(0,((TEMPSENSOR(CENTER_LEFT)-LE_SETPOINT_START)/LE_DIVISOR)),fSellV+0.4)))
 		{
 			//lower tank temp in range -- turn on lower element, set delay, and return
 			if(digitalRead(WH_LOWER_ELEMENT_HV)==ON)
@@ -377,7 +385,7 @@ void LoadControl(void)
 		//still more juce, turn on both elements
 		if((digitalRead(WH_UPPER_ELEMENT)==OFF) && (topTank != irAbove) && (!overTemp) &&
 				(((TOT_LOAD(L1)+UPPER_L1_DIFF)< MAX_LOAD_AMPS) || (FNDC_BATT_VOLTS > 56.0)) && 
-				(FNDC_BATT_VOLTS > MAX(51.2 + MAX(0,((TEMPSENSOR(TOP)-130)/10)),fSellV+0.4)))
+				(FNDC_BATT_VOLTS > MAX(51.2 + MAX(0,((TEMPSENSOR(TOP)-UE_SETPOINT_START)/UE_DIVISOR)),fSellV+0.4)))
 		{
 			//upper tank temp in range -- turn on upper element, set delay, and return
 			digitalWrite(WH_UPPER_ELEMENT,ON);
@@ -411,19 +419,19 @@ void LoadControl(void)
 		}
 	}
 	if((!UnderUtilization) /*&& (netbattamps < 0)*/ && 
-					(FNDC_BATT_VOLTS < MAX(51.2 + MAX(0,((TEMPSENSOR(TOP)-130)/10)),MIN(57,fSellV+1.2)))) 
+					(FNDC_BATT_VOLTS < MAX(51.2 + MAX(0,((TEMPSENSOR(TOP)-UE_SETPOINT_START)/UE_DIVISOR)),MIN(57,fSellV+1.2)))) 
 	{
 		if((digitalRead(WH_UPPER_ELEMENT)==ON) && (topTank != irBelow))
 		{
 			//upper tank temp in range -- turn off upper element, set delay, and return
 			digitalWrite(WH_UPPER_ELEMENT,OFF);
 			lcDelay=DEFAULT_DELAY; wprintw(ScrollWin,"LC @ %d UE_OFF %4.2f %4.2f\n",__LINE__,FNDC_BATT_VOLTS,
-						MAX(51.2 + MAX(0,((TEMPSENSOR(TOP)-130)/10)),MIN(57,fSellV+1.2)));
+						MAX(51.2 + MAX(0,((TEMPSENSOR(TOP)-UE_SETPOINT_START)/UE_DIVISOR)),MIN(57,fSellV+1.2)));
 			return;
 		}
 	}
 	if((!UnderUtilization) /*&& (netbattamps < 0)*/ && 
-				(FNDC_BATT_VOLTS < MAX(50.8+ MAX(0,((TEMPSENSOR(CENTER_LEFT)-135)/15)),MIN(57,fSellV+0.8)))) 
+				(FNDC_BATT_VOLTS < MAX(50.8+ MAX(0,((TEMPSENSOR(CENTER_LEFT)-LE_SETPOINT_START)/LE_DIVISOR)),MIN(57,fSellV+0.8)))) 
 	{
 		if((digitalRead(WH_LOWER_ELEMENT)==ON) && (midTank != irBelow))
 		{
@@ -431,12 +439,12 @@ void LoadControl(void)
 			if(digitalRead(WH_LOWER_ELEMENT_HV)==ON)
 			{
 				digitalWrite(WH_LOWER_ELEMENT_HV,OFF); wprintw(ScrollWin,"LC @ %d LEHV_OFF %4.2f %4.2f\n",__LINE__,FNDC_BATT_VOLTS,
-							MAX(50.8+ MAX(0,((TEMPSENSOR(CENTER_LEFT)-135)/15)),MIN(57,fSellV+0.8)));
+							MAX(50.8+ MAX(0,((TEMPSENSOR(CENTER_LEFT)-LE_SETPOINT_START)/LE_DIVISOR)),MIN(57,fSellV+0.8)));
 				usleep(35000);
 			}
 			digitalWrite(WH_LOWER_ELEMENT,OFF);
 			lcDelay=DEFAULT_DELAY; wprintw(ScrollWin,"LC @ %d LE_OFF %4.2f %4.2f\n",__LINE__,FNDC_BATT_VOLTS,
-							MAX(50.8+ MAX(0,((TEMPSENSOR(CENTER_LEFT)-135)/15)),MIN(57,fSellV+0.8))); 
+							MAX(50.8+ MAX(0,((TEMPSENSOR(CENTER_LEFT)-LE_SETPOINT_START)/LE_DIVISOR)),MIN(57,fSellV+0.8))); 
 			return;
 		}
 	}
