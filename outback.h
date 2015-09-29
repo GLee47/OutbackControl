@@ -41,8 +41,8 @@
 #define WH_LOWER_ELEMENT_HV	12  /* BCM pin# */ 
 #define WH_UPPER_ELEMENT	16  /* BCM pin# */ 
 #define AIR_COND_GPIO_PIN	5	/* frount window unit on/off */
-#define MRCOOL2KHP_PWR_GPIO	6	/*Mr Cool great room pwr high on/low off */
-#define	MRCOOL2KHP_SRC_GPIO	13	/*Mr Cool great room power sorce - high is inverter, low is grid */
+#define MRCOOL2KHP_PWR_GPIO	22	/*Mr Cool great room pwr high on/low off (src must be inverter to turn off i.e. pin 22 high) */
+#define	MRCOOL2KHP_SRC_GPIO	17	/*Mr Cool great room power sorce - high is inverter, low is grid */
 
 //#define WATERHEATEROFF	digitalRead(WH_LOWER_ELEMENT)
 //#define WATERHEATERON	if (INVERTER_AUX_OUT==0){cmdMate("AUXON","1");}
@@ -116,6 +116,8 @@ enum AirCondPwrSrcModes{acpsGrid,acpsInverter,acpsNone};
 		extern float WHtopMaxTemp,WHtopMinTemp,WHCenterMinTemp,WHmaxAnyTemp;	
 		extern int UnderUtilization, sellv;
 		extern float netbattamps;
+		extern const char * acpsModeDesc[];
+		extern enum AirCondPwrSrcModes AirCondPwrSrc;
 	#endif
 
 #endif

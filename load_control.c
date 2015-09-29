@@ -68,6 +68,28 @@ int EstL1A, EstL2A, NeedToShedAmpsL1, NeedToShedAmpsL2;
 static int lcDelay=DEFAULT_DELAY;
 static int modeChangeDelay=4;
 
+void syncACPS(void)
+{
+	AirCondPwrSrc=(digitalRead(MRCOOL2KHP_SRC_GPIO)==0)?acpsGrid:((digitalRead(MRCOOL2KHP_PWR_GPIO)==1)?acpsInverter:acpsNone);
+}
+void setACPS(enum AirCondPwrSrcModes newMode)
+{
+	switch (newMode)
+	{
+		case acpsGrid:
+			digitalWrite(MRCOOL2KHP_PWR_GPIO,0);
+			digitalWrite(MRCOOL2KHP_SRC_GPIO,0);
+			break;
+		case acpsInverter:
+			digitalWrite(MRCOOL2KHP_SRC_GPIO,1);
+			digitalWrite(MRCOOL2KHP_PWR_GPIO,1);
+			break;
+		case acpsNone:
+			digitalWrite(MRCOOL2KHP_PWR_GPIO,0);
+			digitalWrite(MRCOOL2KHP_SRC_GPIO,1);
+			break;
+	}
+}
 int airCondControl(int targetState)
 {
 	static time_t tChangeTime=0;

@@ -81,7 +81,8 @@ char  strtmp[256];
 
 WINDOW * InvWin,* CCWin,* FNDCWin,* ScrollWin;
 int ch;
-bool initilized=NO, EnableSystem=NO, terminate=false, DischargeAllowed=YES, AllowDaytimeInvCharge=FALSE,
+volatile bool terminate=false;
+bool initilized=NO, EnableSystem=NO, DischargeAllowed=YES, AllowDaytimeInvCharge=FALSE,
 				preferHeatPumpOn=FALSE,InvChrgEnabled=NO, MateCommResponseExpected=NO, InvIgnLowVolt=false;
 int CurrentDay, DroppedSecs=0, PowerOutageSecs=0, UnderUtilizationSecs=0;
 long IAO_Day_Secs, IAR_Day_Secs;
@@ -1333,9 +1334,17 @@ void ProcessUserInput(void){
 			case '5':
 				InvInputMode=MiniGrid;
 				break;
-			case '[':
-				AirCondPwrSrc++;
-				if (AirCondPwrSrc>acpsNone) AirCondPwrSrc=acpsGrid;
+			case	'!':
+				digitalWrite(MRCOOL2KHP_PWR_GPIO,1);
+				break;
+			case	'@':
+				digitalWrite(MRCOOL2KHP_PWR_GPIO,0);
+				break;
+			case 	'#':
+				digitalWrite(MRCOOL2KHP_SRC_GPIO,1);
+				break;
+			case	'$':
+				digitalWrite(MRCOOL2KHP_SRC_GPIO,0);
 				break;
 			}
 		}
@@ -1388,7 +1397,8 @@ void printStuff(void){
 	WMVPRINTW(FNDCWin,2,2,"Amps %5.1f %5.1f %5.1f  ",FNDC_SHUNT_A_AMPS,FNDC_SHUNT_B_AMPS,FNDC_SHUNT_C_AMPS);
 	WMVPRINTW(FNDCWin,3,2,"Net Amps%6.1f             ",netbattamps);
 	WMVPRINTW(FNDCWin,4,2,"InvOut/In %6.1f%% ",(INVPWR/((0-FNDC_SHUNT_A_AMPS)*FNDC_BATT_VOLTS))*100);
-	if (InvInputMode != GridTied) WMVPRINTW(FNDCWin,6,2,"ACPS %4s",acpsModeDesc[AirCondPwrSrc]);
+	if (InvInputMode != GridTied) WMVPRINTW(FNDCWin,6,2,"ACPS %4s S %d P %d",acpsModeDesc[AirCondPwrSrc],
+						digitalRead(MRCOOL2KHP_SRC_GPIO),digitalRead(MRCOOL2KHP_PWR_GPIO));
 	WMVPRINTW(FNDCWin,7,1,"MaxNegA Dropped %5.1f ",MaxNegBatAmpsDropped);
 	WMVPRINTW(FNDCWin,8,2,"KB Locked %s ",((KBLock) ? "Yes Press ^":"No Press L "));
 	WMVPRINTW(FNDCWin,10,2,"%s         ","  ");
