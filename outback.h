@@ -72,7 +72,7 @@
 #define FNDC_BATT_TEMP		((((float)(data[FNDC_INDX][11])-10.0)*1.8)+32)
 #define CC1_MODE			(data[CC1_INDX][10])	//BufInt(CC1_START+34,2)
 #define CC2_MODE			(data[CC2_INDX][10])	//BufInt(CC2_START+34,2)
-#define INVERTER_AC_MODE	(data[INVERT_INDX][18])	//BufInt(INVERTER_START+62,2)
+#define INVERTER_AC_MODE	(enum InverterACModes)(data[INVERT_INDX][18])	//BufInt(INVERTER_START+62,2)
 #define INVERTER_OP_MODE	(data[INVERT_INDX][16])	//BufInt(INVERTER_START+55,2)
 #define L1_INVERTER_AMPS	(data[INVERT_INDX][2])	//BufInt(INVERTER_START+7,2)
 #define L2_INVERTER_AMPS	(data[INVERT_INDX][9])	//BufInt(INVERTER_START+31,2)
@@ -110,7 +110,7 @@
 #define INV_IS_OFF			0
 		
 enum InverterACModes{iacmNoGr=0,iacmDrop=1,iacmUse=2};
-enum AirCondPwrSrcModes{acpsGrid,acpsInverter,acpsNone};
+
 
 	#ifndef __MateMonitor_c__
 		extern float WHtopMaxTemp,WHtopMinTemp,WHCenterMinTemp,WHmaxAnyTemp;	

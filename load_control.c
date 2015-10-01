@@ -1,4 +1,5 @@
 //LoadControl.c
+#define __LoadControl_c__
 
 #include "load_control.h"
 #include "outback.h"
@@ -89,7 +90,11 @@ void setACPS(enum AirCondPwrSrcModes newMode)
 			digitalWrite(MRCOOL2KHP_SRC_GPIO,1);
 			break;
 	}
+	syncACPS();
 }
+
+#define ACC_ON_NOW	3	
+#define ACC_OFF_NOW	2	
 int airCondControl(int targetState)
 {
 	static time_t tChangeTime=0;
@@ -97,7 +102,7 @@ int airCondControl(int targetState)
 	
 	if ((difftime(time(NULL),tChangeTime)>200.0) || (targetState>ON))
 	{
-		if((targetState==ON) || (targetState==3))  //ON=turn On if time has elapsed /3 means now
+		if((targetState==ON) || (targetState==ACC_ON_NOW))  //ON=turn On if time has elapsed /3 means now
 		{
 			if (digitalRead(AIR_COND_GPIO_PIN)==OFF)
 			{
@@ -106,7 +111,7 @@ int airCondControl(int targetState)
 				return TRUE;
 			}
 		}
-		else if((targetState==OFF) || (targetState==2)) // OFF is turn Off if time has elapsed / 2 means now
+		else if((targetState==OFF) || (targetState==ACC_OFF_NOW)) // OFF is turn Off if time has elapsed / 2 means now
 		{
 			if(digitalRead(AIR_COND_GPIO_PIN)==ON)
 			{
@@ -123,6 +128,7 @@ int airCondControl(int targetState)
 //load shed will seek overload conditions and reduce loads
 void loadShed(void)
 {
+	syncACPS();
 	if((INVERTER_AC_MODE!=iacmDrop) && (INVERTER_AC_MODE!=iacmNoGr))
 		modeChangeDelay=4; 
 	else 
@@ -151,6 +157,12 @@ void loadShed(void)
 				EstL1A-= UPPER_L1_DIFF;
 				lcDelay=DEFAULT_DELAY;
 		}
+		if((NeedToShedAmpsL1>0) && (AirCondPwrSrc==acpsInverter))//heat pump--we don't know if a load exists nor the size of it
+		{
+			setACPS(acpsGrid);lcDelay=DEFAULT_DELAY;
+			NeedToShedAmpsL1-=5;//We don't know what, if anything, was reduced. Maybe the 5A guess will delay futher triggers
+			wprintw(ScrollWin,"LC @ %d  ACPS %s\n",__LINE__,acpsModeDesc[AirCondPwrSrc]);
+		}
 		if((NeedToShedAmpsL1>0) && (INVERTER_AUX_OUT!=0))
 		{
 			compressor(OFF); wprintw(ScrollWin,"LC @ %d\n",__LINE__);					
@@ -158,14 +170,13 @@ void loadShed(void)
 			EstL1A-= COMPRESSOR_L1_DIFF;
 			lcDelay=DEFAULT_DELAY;
 		}	
-		if((NeedToShedAmpsL1>0) && (digitalRead(AIR_COND_GPIO_PIN)==ON))
+		if((NeedToShedAmpsL1>0) && (digitalRead(AIR_COND_GPIO_PIN)==ON))//this is the window unit in old living room
 		{
-			airCondControl(2); wprintw(ScrollWin,"LC @ %d\n",__LINE__);					
+			airCondControl(ACC_OFF_NOW); wprintw(ScrollWin,"LC @ %d\n",__LINE__);					
 			NeedToShedAmpsL1-= AIR_COND_AMPS;
 			EstL1A-= AIR_COND_AMPS;
 			lcDelay=DEFAULT_DELAY;
 		}	
-	
 	}
 	if(EstL2A > MAX_LOAD_AMPS)
 	{ //got to shed something on L2
@@ -184,20 +195,19 @@ void loadShed(void)
 			EstL2A-= LOWER_LV_L2_DIFF;
 			lcDelay=DEFAULT_DELAY;
 		}
+		if((NeedToShedAmpsL2>0) && (AirCondPwrSrc==acpsInverter))
+		{
+			setACPS(acpsGrid);lcDelay=DEFAULT_DELAY;
+			NeedToShedAmpsL2-=5;//We don't know what, if anything, was reduced. Maybe the 5A guess will delay futher triggers
+			wprintw(ScrollWin,"LC @ %d  ACPS %s\n",__LINE__,acpsModeDesc[AirCondPwrSrc]);
+		}	
 		if((NeedToShedAmpsL2>0) && (digitalRead(AIR_COND_GPIO_PIN)==ON))
 		{
-			airCondControl(2); wprintw(ScrollWin,"LC @ %d\n",__LINE__);					
+			airCondControl(ACC_OFF_NOW); wprintw(ScrollWin,"LC @ %d\n",__LINE__);					
 			NeedToShedAmpsL2-= AIR_COND_AMPS;
 			EstL2A-= AIR_COND_AMPS;
 			lcDelay=DEFAULT_DELAY;
 		}	
-/*		if((NeedToShedAmps>0) && (INVERTER_AUX_OUT!=0))
-		{
-			compressor(OFF);					
-			NeedToShedAmps-= COMPRESSOR_L2_DIFF;
-			EstL2A-= COMPRESSOR_L2_DIFF;
-			lcDelay=DEFAULT_DELAY;
-		}	*/
 	}
 	if(lcDelay==0) LoadControl();
 }
@@ -208,6 +218,7 @@ void LoadControl(void)
 	float midTankTemp=MAX(TEMPSENSOR(CENTER_RIGHT),TEMPSENSOR(CENTER_LEFT));
 	enum inRange topTank=(TEMPSENSOR(TOP) < WHtopMinTemp ? irBelow : ((TEMPSENSOR(TOP) > WHtopMaxTemp) ? irAbove :irIn));
 	enum inRange midTank=(midTankTemp < WHCenterMinTemp ? irBelow : (midTankTemp > WHMAXTEMP ? irAbove :irIn));
+	static enum InverterACModes lastIACMode=iacmNoGr;
 //	wprintw(ScrollWin,"%d %d %d %d\n",INVERTER_AUX_OUT,TOT_LOAD(L2),COMPRESSOR_L2_DIFF,MAX_LOAD_AMPS);
 //	wprintw(ScrollWin,"%5.1f %5.1f %d %d\n",netbattamps, DCamps(LOWER_LV_L2_DIFF),(digitalRead(WH_LOWER_ELEMENT)==OFF),midTank);
 	if(INVERTER_AUX_OUT==0)
@@ -262,8 +273,13 @@ void LoadControl(void)
 	}
 	if((INVERTER_AC_MODE==iacmNoGr)) //grid down 
 	{ 
-		 if(FNDC_BATT_VOLTS < 54)
-		 {
+		if(lastIACMode!=iacmNoGr)
+		{
+			lastIACMode=iacmNoGr;
+			if(AirCondPwrSrc==acpsInverter)	setACPS(acpsNone);
+		}
+		if(FNDC_BATT_VOLTS < 54)
+		{
 		//turn one element off, set delay , and return
 			if(digitalRead(WH_LOWER_ELEMENT)==ON)	//favoring upper element to get some hot quick
 			{
@@ -279,7 +295,7 @@ void LoadControl(void)
 			}
 			if (digitalRead(AIR_COND_GPIO_PIN))
 			{
-				if(airCondControl(2)==TRUE)
+				if(airCondControl(ACC_OFF_NOW)==TRUE)
 				{
 					lcDelay=DEFAULT_DELAY; wprintw(ScrollWin,"LC @ %d\n",__LINE__);		
 					return;	
@@ -314,9 +330,10 @@ void LoadControl(void)
 	}
 	else if(INVERTER_AC_MODE==iacmUse)  //using grid -- minimize use
 	{
+		lastIACMode=iacmUse;
 		if (digitalRead(AIR_COND_GPIO_PIN) && (preferHeatPumpOn==FALSE))
 		{
-			if(airCondControl(2)==TRUE)
+			if(airCondControl(ACC_OFF_NOW)==TRUE)
 			{
 				lcDelay=DEFAULT_DELAY; wprintw(ScrollWin,"LC @ %d\n",__LINE__);		
 				return;	
@@ -360,14 +377,15 @@ void LoadControl(void)
 	//we haven't returned yet we must be in dropped grid mode -- try to manage charge volts
 	//(INVERTER_AC_MODE==iacmDrop)
 	
+	lastIACMode=INVERTER_AC_MODE;
 	if(modeChangeDelay>0)
 	{ /*wprintw(ScrollWin,"LC @ %d\n",__LINE__);*/
 		return;
 	}
 	
 	if((UnderUtilization)||(netbattamps > DCamps(LOWER_LV_L2_DIFF))
-							||(FNDC_BATT_VOLTS > MAX(54.0,fSellV))) {//excess power. Find something to turn on
-		
+							||(FNDC_BATT_VOLTS > MAX(54.0,fSellV))) 
+	{								//excess power. Find something to turn on
 		if ((digitalRead(AIR_COND_GPIO_PIN)==FALSE) && (preferHeatPumpOn==TRUE) 
 				&& ((TOT_LOAD(L1)+AIR_COND_AMPS)< MAX_LOAD_AMPS) && ((TOT_LOAD(L2)+AIR_COND_AMPS)< MAX_LOAD_AMPS))
 		{
@@ -377,7 +395,11 @@ void LoadControl(void)
 				return;	
 			}
 		}
-
+		if ((AirCondPwrSrc==acpsGrid) && ((TOT_LOAD(L1)+10)< MAX_LOAD_AMPS) && ((TOT_LOAD(L2)+10)< MAX_LOAD_AMPS))
+		{
+			setACPS(acpsInverter);
+			lcDelay=DEFAULT_DELAY; wprintw(ScrollWin,"LC @ %d  ACPS %s\n",__LINE__,acpsModeDesc[AirCondPwrSrc]);
+		}
 		//Top<120 start here
 		if((TEMPSENSOR(TOP) < WH_TOP_NORMAL_TEMP) && (digitalRead(WH_UPPER_ELEMENT)==OFF) && (topTank != irAbove) && (!overTemp) && 
 				(((TOT_LOAD(L1)+UPPER_L1_DIFF)< MAX_LOAD_AMPS) || (FNDC_BATT_VOLTS > 56.0)) && (FNDC_BATT_VOLTS > MAX(50.7,fSellV+0.6)))
@@ -416,7 +438,7 @@ void LoadControl(void)
 		}
 		if ((digitalRead(AIR_COND_GPIO_PIN)==FALSE) && (preferHeatPumpOn==FALSE)
 				&& ((TOT_LOAD(L1)+AIR_COND_AMPS)< MAX_LOAD_AMPS) && ((TOT_LOAD(L2)+AIR_COND_AMPS)< MAX_LOAD_AMPS)
-				&& (FNDC_BATT_VOLTS > MIN(MAX(53.2 + MAX(1,((TEMPSENSOR(TOP)-130)/12)),fSellV+2.4),56.8)))
+				&& (FNDC_BATT_VOLTS >= 58.0/*MIN(MAX(53.2 + MAX(1,((TEMPSENSOR(TOP)-130)/12)),fSellV+2.4),56.8)*/))
 		{
 			if(airCondControl(ON)==TRUE)
 			{ 

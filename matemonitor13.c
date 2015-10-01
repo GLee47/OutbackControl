@@ -337,6 +337,7 @@ static long c=0L, AvHrSOC=0L;
 
 	++c; AvHrVolts+=FNDC_BATT_VOLTS; AvHrSOC+=(long)FNDC_SOC;
 //static enum LockStates InvAuxLockSaved=Undefined;
+	if (TimeTest(0,30,0))	setACPS(acpsNone);
 //	5AM
 	if (TimeTest(5,30,0))	AmpsBelowThresholdWaitSecs=25;
 //	7AM
@@ -358,8 +359,8 @@ static long c=0L, AvHrSOC=0L;
 	}
 	
 //8AM Mon,Wed,Fri
-/*	if((dow==1) || (dow==3) || (dow==5))
-		if(TimeTest(8,0,0)){
+/*	if((dow==1) || (dow==3) || (dow==5))*/
+		if(TimeTest(8,0,0))	setACPS(acpsInverter);/*{
 			WHtopMinTemp=125.0;
 			WHCenterMinTemp=125.0;		
 		}
