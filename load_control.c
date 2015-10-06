@@ -161,7 +161,7 @@ void loadShed(void)
 		{
 			setACPS(acpsGrid);lcDelay=DEFAULT_DELAY;
 			NeedToShedAmpsL1-=5;//We don't know what, if anything, was reduced. Maybe the 5A guess will delay futher triggers
-			wprintw(ScrollWin,"LC @ %d  ACPS %s\n",__LINE__,acpsModeDesc[AirCondPwrSrc]);
+			wprintw(ScrollWin,"LC @ %d  ACPS %s NTSAL1 %d EL1A %d\n",__LINE__,acpsModeDesc[AirCondPwrSrc],NeedToShedAmpsL1,EstL1A);
 		}
 		if((NeedToShedAmpsL1>0) && (INVERTER_AUX_OUT!=0))
 		{
@@ -199,7 +199,7 @@ void loadShed(void)
 		{
 			setACPS(acpsGrid);lcDelay=DEFAULT_DELAY;
 			NeedToShedAmpsL2-=5;//We don't know what, if anything, was reduced. Maybe the 5A guess will delay futher triggers
-			wprintw(ScrollWin,"LC @ %d  ACPS %s\n",__LINE__,acpsModeDesc[AirCondPwrSrc]);
+			wprintw(ScrollWin,"LC @ %d  ACPS %s NTSAL2 %d EL2A %d\n",__LINE__,acpsModeDesc[AirCondPwrSrc],NeedToShedAmpsL2,EstL2A);
 		}	
 		if((NeedToShedAmpsL2>0) && (digitalRead(AIR_COND_GPIO_PIN)==ON))
 		{

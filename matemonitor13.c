@@ -1379,11 +1379,12 @@ void printStuff(void){
 									CC1_AMPS*CC1_BATT_VOLTS+CC2_AMPS*CC2_BATT_VOLTS);
 	WMVPRINTW(CCWin,8,2,"%Rating %5.1f%%",	(CC1_AMPS*CC1_BATT_VOLTS+CC2_AMPS*CC2_BATT_VOLTS)/(ArrayRatedWatts/100));
 
-	WMVPRINTW(CCWin,9,2,"M%1d A%1d T%1d DT%1d C%1d S%1d TE%d",whsSetFlags(whsManual,whsInquiry),whsSetFlags(whsAuto,whsInquiry),
+/*	WMVPRINTW(CCWin,9,2,"M%1d A%1d T%1d DT%1d C%1d S%1d TE%d",whsSetFlags(whsManual,whsInquiry),whsSetFlags(whsAuto,whsInquiry),
 			whsSetFlags(whsTimer,whsInquiry),whsSetFlags(whsDisableTimer,whsInquiry),
-			whsSetFlags(whsConserve,whsInquiry), whGetDesiredState(/*digitalRead(WH_LOWER_ELEMENT),INVERTER_AUX_OUT,*/
-			(L1_INVERTER_AMPS+L1_CHARGER_AMPS+L1_BUY_AMPS-L1_SELL_AMPS),
-			(L2_INVERTER_AMPS+L2_CHARGER_AMPS+L2_BUY_AMPS-L2_SELL_AMPS)),digitalRead(WH_UPPER_ELEMENT));
+			whsSetFlags(whsConserve,whsInquiry), whGetDesiredState(**digitalRead(WH_LOWER_ELEMENT),INVERTER_AUX_OUT,*/
+/*			(L1_INVERTER_AMPS+L1_CHARGER_AMPS+L1_BUY_AMPS-L1_SELL_AMPS),
+			(L2_INVERTER_AMPS+L2_CHARGER_AMPS+L2_BUY_AMPS-L2_SELL_AMPS)),digitalRead(WH_UPPER_ELEMENT));*/
+	WMVPRINTW(CCWin,9,2,"Living F%5.1f",sensor[6].tempF);
 	WMVPRINTW(CCWin,10,2,"%02d:%02d:%02d  %02d:%02d:%02d",hour,minute,second,ResetTime_p.tm_hour,ResetTime_p.tm_min
 															,ResetTime_p,ResetTime_p.tm_sec);
 	WMVPRINTW(CCWin,11,2,"   %5.1f        >%3.0f",readSensorF(2,666.6),WHtopMinTemp);									
