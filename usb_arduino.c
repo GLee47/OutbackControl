@@ -46,6 +46,7 @@ struct address64 sensorAddress[20]={	{0x28680315,0x600005A},
 										{0x28F21415,0x6000009},
 										{0x281B1C15,0x6000088},
 										{0x28BF4615,0x6000020},
+										{0x28A86515,0x6000048},
 										{0,0}
 };
 
@@ -61,7 +62,7 @@ int getAddressIndx(long address1,long address2){
 	for (i=0;i<20;i++){
 		if (sensorAddress[i].highval==0) 
 		{
-			wprintw(ScrollWin,"%ld %ld\n",address1,address2);
+			wprintw(ScrollWin,"%lx %lx\n",address1,address2);
 			return -1;
 		}
 		if ((sensorAddress[i].highval==address1) && (sensorAddress[i].lowval==address2))return i;

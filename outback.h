@@ -29,26 +29,31 @@
 //#define DATA_FILE_NAME	"/mnt/sda1/home/glee/c/matedata2014_12_11.csv"
 //#define MATE3_USB "/dev/ttyMate3" 
 #define DEFAULT_SELL_V_MIN 512
-#define DEFAULT_SELL_V_MAX 556
+#define DEFAULT_SELL_V_MAX 576
 //#define GP_MAX	1250
 //#define GP_MIN	0
 #define SUPPORT_MODE_MIN_ADJ_SELL_VOLTS 448
-#define SUPPORT_MODE_MAX_ADJ_SELL_VOLTS 560
+#define SUPPORT_MODE_MAX_ADJ_SELL_VOLTS 572
 #define MIN_SOC_DROPPED	55
 #define MIN_VOLTS_DROPPED 44.8
 #define MAX_NEG_NBA_DROPPED	20
-#define WH_LOWER_ELEMENT	26  /* BCM pin# */ 
-#define WH_LOWER_ELEMENT_HV	12  /* BCM pin# */ 
-#define WH_UPPER_ELEMENT	16  /* BCM pin# */ 
-#define AIR_COND_GPIO_PIN	5	/* frount window unit on/off */
-#define MRCOOL2KHP_PWR_GPIO	22	/*Mr Cool great room pwr high on/low off (src must be inverter to turn off i.e. pin 22 high) */
-#define	MRCOOL2KHP_SRC_GPIO	17	/*Mr Cool great room power sorce - high is inverter, low is grid */
+//pins
+#define WH_LOWER_ELEMENT		26  /* BCM pin# */ 
+#define WH_LOWER_ELEMENT_HV		12  /* BCM pin# */ 
+#define WH_LOWER_ELEMENT_SRC	27	/* BCM pin# */
+#define WH_UPPER_ELEMENT		16  /* BCM pin# */ 
+#define AIR_COND_GPIO_PIN		5	/* frount window unit on/off */
+#define MRCOOL2KHP_PWR_GPIO		22	/*Mr Cool great room pwr high on/low off (src must be inverter to turn off i.e. pin 22 high) */
+#define	MRCOOL2KHP_SRC_GPIO		17	/*Mr Cool great room power sorce - high is inverter, low is grid */
+#define MrCoolOffTemp			68.5
+#define MR_COOL_ON_TEMP_DEFAULT	69.5	
 
 //#define WATERHEATEROFF	digitalRead(WH_LOWER_ELEMENT)
 //#define WATERHEATERON	if (INVERTER_AUX_OUT==0){cmdMate("AUXON","1");}
 #define WaterHeaterKWH ((((float)IAO_Day_Secs)/3600.0)*1.08)+(((((float)IAR_Day_Secs)/3600.0))*4.32)
 #define MAX(ARG1,ARG2)		(((ARG1)>(ARG2)) ? (ARG1) : (ARG2))
 #define MIN(ARG1,ARG2)		(((ARG1)<(ARG2)) ? (ARG1) : (ARG2))
+#define BETWEEN(ARG,LOW,HI)	((ARG>=LOW) && (ARG<=HI))
 //#define INT_ROUND(NUMBR,RESOLUTION)	NUMBR=(((int)((NUMBR+(RESOLUTION/2))/(float)RESOLUTION))*RESOLUTION)
 #define INVERTER_START	14
 #define CC1_START		90
@@ -114,7 +119,7 @@ enum InverterACModes{iacmNoGr=0,iacmDrop=1,iacmUse=2};
 
 	#ifndef __MateMonitor_c__
 		extern float WHtopMaxTemp,WHtopMinTemp,WHCenterMinTemp,WHmaxAnyTemp;	
-		extern int UnderUtilization, sellv;
+		extern int UnderUtilization, sellv, vacation;
 		extern float netbattamps;
 		extern const char * acpsModeDesc[];
 		extern enum AirCondPwrSrcModes AirCondPwrSrc;

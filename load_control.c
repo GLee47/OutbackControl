@@ -25,10 +25,11 @@ extern bool preferHeatPumpOn;
 #define COMPRESSOR_L2_DIFF	0
 #define AIR_COND_AMPS		6
 
-#define LE_SETPOINT_START	145
-#define	LE_DIVISOR			5
-#define UE_SETPOINT_START	130
-#define	UE_DIVISOR			8
+#define VACATION_VSET		56
+#define LE_SETPOINT_START	120
+#define	LE_DIVISOR			10
+#define UE_SETPOINT_START	115
+#define	UE_DIVISOR			10
 #define AC_SETPOINT_START	135
 #define	AC_DIVISOR			20
 
@@ -73,8 +74,13 @@ void syncACPS(void)
 {
 	AirCondPwrSrc=(digitalRead(MRCOOL2KHP_SRC_GPIO)==0)?acpsGrid:((digitalRead(MRCOOL2KHP_PWR_GPIO)==1)?acpsInverter:acpsNone);
 }
-void setACPS(enum AirCondPwrSrcModes newMode)
+int setACPS(enum AirCondPwrSrcModes newMode)
 {
+	static time_t acpsOffTime;
+	if (difftime(time(NULL),acpsOffTime)<30)
+	{ 
+		if((newMode!=acpsNone) && (AirCondPwrSrc==acpsNone))return 0;
+	}
 	switch (newMode)
 	{
 		case acpsGrid:
@@ -82,15 +88,36 @@ void setACPS(enum AirCondPwrSrcModes newMode)
 			digitalWrite(MRCOOL2KHP_SRC_GPIO,0);
 			break;
 		case acpsInverter:
-			digitalWrite(MRCOOL2KHP_SRC_GPIO,1);
-			digitalWrite(MRCOOL2KHP_PWR_GPIO,1);
+			if(((TOT_LOAD(L1)+10)< MAX_LOAD_AMPS) && ((TOT_LOAD(L2)+10)< MAX_LOAD_AMPS))
+			{
+				digitalWrite(MRCOOL2KHP_SRC_GPIO,1);
+				digitalWrite(MRCOOL2KHP_PWR_GPIO,1);
+			}
+			else
+			{
+				return 0;
+			}
 			break;
 		case acpsNone:
+			if(AirCondPwrSrc!=acpsNone)time(&acpsOffTime);
 			digitalWrite(MRCOOL2KHP_PWR_GPIO,0);
 			digitalWrite(MRCOOL2KHP_SRC_GPIO,1);
 			break;
+		case acpsOn:
+			if(((TOT_LOAD(L1)+10)< MAX_LOAD_AMPS) && ((TOT_LOAD(L2)+10)< MAX_LOAD_AMPS))
+			{
+				digitalWrite(MRCOOL2KHP_SRC_GPIO,1);
+				digitalWrite(MRCOOL2KHP_PWR_GPIO,1);
+			}
+			else
+			{
+				digitalWrite(MRCOOL2KHP_PWR_GPIO,0);
+				digitalWrite(MRCOOL2KHP_SRC_GPIO,0);
+			}
+			break;
 	}
 	syncACPS();
+	return ((AirCondPwrSrc==newMode)||((newMode==acpsOn) && (AirCondPwrSrc!=acpsNone)));
 }
 
 #define ACC_ON_NOW	3	
@@ -159,7 +186,7 @@ void loadShed(void)
 		}
 		if((NeedToShedAmpsL1>0) && (AirCondPwrSrc==acpsInverter))//heat pump--we don't know if a load exists nor the size of it
 		{
-			setACPS(acpsGrid);lcDelay=DEFAULT_DELAY;
+			setACPS((vacation==false)?acpsGrid:acpsNone);lcDelay=DEFAULT_DELAY;
 			NeedToShedAmpsL1-=5;//We don't know what, if anything, was reduced. Maybe the 5A guess will delay futher triggers
 			wprintw(ScrollWin,"LC @ %d  ACPS %s NTSAL1 %d EL1A %d\n",__LINE__,acpsModeDesc[AirCondPwrSrc],NeedToShedAmpsL1,EstL1A);
 		}
@@ -197,9 +224,9 @@ void loadShed(void)
 		}
 		if((NeedToShedAmpsL2>0) && (AirCondPwrSrc==acpsInverter))
 		{
-			setACPS(acpsGrid);lcDelay=DEFAULT_DELAY;
+			setACPS((vacation==false)?acpsGrid:acpsNone);lcDelay=DEFAULT_DELAY;
 			NeedToShedAmpsL2-=5;//We don't know what, if anything, was reduced. Maybe the 5A guess will delay futher triggers
-			wprintw(ScrollWin,"LC @ %d  ACPS %s NTSAL2 %d EL2A %d\n",__LINE__,acpsModeDesc[AirCondPwrSrc],NeedToShedAmpsL2,EstL2A);
+			wprintw(ScrollWin,"LC @ %d  ACPS %s NTSL2A %d EL2A %d\n",__LINE__,acpsModeDesc[AirCondPwrSrc],NeedToShedAmpsL2,EstL2A);
 		}	
 		if((NeedToShedAmpsL2>0) && (digitalRead(AIR_COND_GPIO_PIN)==ON))
 		{
@@ -276,7 +303,7 @@ void LoadControl(void)
 		if(lastIACMode!=iacmNoGr)
 		{
 			lastIACMode=iacmNoGr;
-			if(AirCondPwrSrc==acpsInverter)	setACPS(acpsNone);
+			if(AirCondPwrSrc==acpsInverter)	setACPS(acpsGrid);
 		}
 		if(FNDC_BATT_VOLTS < 54)
 		{
@@ -331,6 +358,10 @@ void LoadControl(void)
 	else if(INVERTER_AC_MODE==iacmUse)  //using grid -- minimize use
 	{
 		lastIACMode=iacmUse;
+		if((vacation==TRUE)&&(AirCondPwrSrc!=acpsNone))
+		{
+			if(setACPS(acpsNone))wprintw(ScrollWin,"LC @ %d acps off\n",__LINE__);
+		}
 		if (digitalRead(AIR_COND_GPIO_PIN) && (preferHeatPumpOn==FALSE))
 		{
 			if(airCondControl(ACC_OFF_NOW)==TRUE)
@@ -371,6 +402,7 @@ void LoadControl(void)
 				digitalWrite(WH_LOWER_ELEMENT,ON); 
 			}
 		}
+		if(vacation==TRUE)setACPS(acpsNone);
 		return;
 	}
 	
@@ -383,15 +415,22 @@ void LoadControl(void)
 		return;
 	}
 	
-	if((UnderUtilization)||(netbattamps > DCamps(LOWER_LV_L2_DIFF))
-							||(FNDC_BATT_VOLTS > MAX(54.0,fSellV))) 
+	if((UnderUtilization)||((vacation==FALSE)&&(netbattamps > DCamps(LOWER_LV_L2_DIFF)))
+				||((vacation==FALSE)&&(FNDC_BATT_VOLTS > MAX(54.0,fSellV)))||((vacation==TRUE)&&(FNDC_BATT_VOLTS>VACATION_VSET)))
 	{								//excess power. Find something to turn on
+		if((vacation==TRUE)&&(AirCondPwrSrc!=acpsInverter))
+		{
+			if(setACPS(acpsInverter))
+			{
+				lcDelay=30;wprintw(ScrollWin,"LC @ %d acps inverter\n",__LINE__);
+			}
+		}
 		if ((digitalRead(AIR_COND_GPIO_PIN)==FALSE) && (preferHeatPumpOn==TRUE) 
 				&& ((TOT_LOAD(L1)+AIR_COND_AMPS)< MAX_LOAD_AMPS) && ((TOT_LOAD(L2)+AIR_COND_AMPS)< MAX_LOAD_AMPS))
 		{
 			if(airCondControl(ON)==TRUE)
 			{ 
-				lcDelay=DEFAULT_DELAY; wprintw(ScrollWin,"LC @ %d\n",__LINE__);		
+				lcDelay=DEFAULT_DELAY; wprintw(ScrollWin,"LC @ %d AC on (prefered)\n",__LINE__);		
 				return;	
 			}
 		}
@@ -406,13 +445,13 @@ void LoadControl(void)
 		{
 			//upper tank temp in range -- turn on upper element, set delay, and return
 			digitalWrite(WH_UPPER_ELEMENT,ON);
-			lcDelay=DEFAULT_DELAY; wprintw(ScrollWin,"LC @ %d\n",__LINE__);
+			lcDelay=DEFAULT_DELAY; wprintw(ScrollWin,"LC @ %d UE_ON %4.2f %4.2f\n",__LINE__,FNDC_BATT_VOLTS,MAX(50.7,fSellV+0.6));
 			return;
 		}
 		//top >120 or we got more juce them bring up bottom temp
 		if((digitalRead(WH_LOWER_ELEMENT)==OFF) && (midTank != irAbove) && 
 				(((TOT_LOAD(L2)+LOWER_LV_L2_DIFF)< MAX_LOAD_AMPS) || (FNDC_BATT_VOLTS > 56.0)) && 
-				(FNDC_BATT_VOLTS > MAX(50.8 + MAX(0,((TEMPSENSOR(CENTER_LEFT)-LE_SETPOINT_START)/LE_DIVISOR)),fSellV+0.4)))
+				(FNDC_BATT_VOLTS > MAX(50.8 + MAX(0,((TEMPSENSOR(CENTER_LEFT)-LE_SETPOINT_START)/LE_DIVISOR)),MIN(57,fSellV+0.8)/*fSellV+0.4*/)))
 		{
 			//lower tank temp in range -- turn on lower element, set delay, and return
 			if(digitalRead(WH_LOWER_ELEMENT_HV)==ON)
@@ -422,18 +461,20 @@ void LoadControl(void)
 			}
 			if (!overTemp){
 				digitalWrite(WH_LOWER_ELEMENT,ON);
-				lcDelay=DEFAULT_DELAY; wprintw(ScrollWin,"LC @ %d\n",__LINE__);
+				lcDelay=DEFAULT_DELAY; wprintw(ScrollWin,"LC @ %d LE_ON %4.2f %4.2f\n",__LINE__,FNDC_BATT_VOLTS,
+							MAX(50.8+ MAX(0,((TEMPSENSOR(CENTER_LEFT)-LE_SETPOINT_START)/LE_DIVISOR)),MIN(57,fSellV+0.8)));
 				return;
 			}
 		}
 		//still more juce, turn on both elements
 		if((digitalRead(WH_UPPER_ELEMENT)==OFF) && (topTank != irAbove) && (!overTemp) &&
 				(((TOT_LOAD(L1)+UPPER_L1_DIFF)< MAX_LOAD_AMPS) || (FNDC_BATT_VOLTS > 56.0)) && 
-				(FNDC_BATT_VOLTS > MAX(51.2 + MAX(0,((TEMPSENSOR(TOP)-UE_SETPOINT_START)/UE_DIVISOR)),fSellV+0.4)))
+				(FNDC_BATT_VOLTS > MAX(51.2 + MAX(0,((TEMPSENSOR(TOP)-UE_SETPOINT_START)/UE_DIVISOR)),fSellV+1.2)))
 		{
 			//upper tank temp in range -- turn on upper element, set delay, and return
 			digitalWrite(WH_UPPER_ELEMENT,ON);
-			lcDelay=DEFAULT_DELAY; wprintw(ScrollWin,"LC @ %d\n",__LINE__);
+			lcDelay=DEFAULT_DELAY; wprintw(ScrollWin,"LC @ %d UE_ON %4.2f %4.2f\n",__LINE__,FNDC_BATT_VOLTS,
+							MAX(51.2 + MAX(0,((TEMPSENSOR(TOP)-UE_SETPOINT_START)/UE_DIVISOR)),fSellV+1.2));
 			return;
 		}
 		if ((digitalRead(AIR_COND_GPIO_PIN)==FALSE) && (preferHeatPumpOn==FALSE)
@@ -463,7 +504,8 @@ void LoadControl(void)
 		}
 	}
 	if((!UnderUtilization) /*&& (netbattamps < 0)*/ && 
-					(FNDC_BATT_VOLTS < MAX(51.2 + MAX(0,((TEMPSENSOR(TOP)-UE_SETPOINT_START)/UE_DIVISOR)),MIN(57,fSellV+1.2)))) 
+					(((FNDC_BATT_VOLTS<VACATION_VSET)&&(vacation==TRUE))||
+					(FNDC_BATT_VOLTS < MAX(51.2 + MAX(0,((TEMPSENSOR(TOP)-UE_SETPOINT_START)/UE_DIVISOR)),MIN(57,fSellV+1.2))))) 
 	{
 		if((digitalRead(WH_UPPER_ELEMENT)==ON) && (topTank != irBelow))
 		{
@@ -475,7 +517,8 @@ void LoadControl(void)
 		}
 	}
 	if((!UnderUtilization) /*&& (netbattamps < 0)*/ && 
-				(FNDC_BATT_VOLTS < MAX(50.8+ MAX(0,((TEMPSENSOR(CENTER_LEFT)-LE_SETPOINT_START)/LE_DIVISOR)),MIN(57,fSellV+0.8)))) 
+				(((FNDC_BATT_VOLTS<(VACATION_VSET-0.4))&&(vacation==TRUE))||
+				(FNDC_BATT_VOLTS < MAX(50.8+ MAX(0,((TEMPSENSOR(CENTER_LEFT)-LE_SETPOINT_START)/LE_DIVISOR)),MIN(57,fSellV+0.8))))) 
 	{
 		if((digitalRead(WH_LOWER_ELEMENT)==ON) && (midTank != irBelow))
 		{
@@ -502,5 +545,6 @@ void LoadControl(void)
 				return;	
 			}
 		}
-	}	
+	}
+	if((vacation==TRUE)&&(FNDC_BATT_VOLTS<(VACATION_VSET-1.6)))setACPS(acpsNone);
 }

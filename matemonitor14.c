@@ -82,7 +82,7 @@ char  strtmp[256];
 WINDOW * InvWin,* CCWin,* FNDCWin,* ScrollWin;
 int ch;
 volatile bool terminate=false;
-bool initilized=NO, EnableSystem=NO, DischargeAllowed=YES, AllowDaytimeInvCharge=FALSE,vacation=TRUE,
+bool initilized=NO, EnableSystem=NO, DischargeAllowed=YES, AllowDaytimeInvCharge=FALSE,BathDone=FALSE,
 				preferHeatPumpOn=FALSE,InvChrgEnabled=NO, MateCommResponseExpected=NO, InvIgnLowVolt=false;
 int CurrentDay, DroppedSecs=0, PowerOutageSecs=0, UnderUtilizationSecs=0;
 long IAO_Day_Secs, IAR_Day_Secs;
@@ -90,7 +90,8 @@ int AC1InLimit=45, BatTrgV=512, SOCstart=100;
 float BatAmpHrIn=0.0, BatAmpHrOut=0.0, BatAmpHrCrx=0.0, MaxVNegAmps=0.0,BattEffFac=0.91,ChargeDisableTrigV=51.0;
 float SellWH,BuyWH,InvWatts,InvWH, netbattamps=0.0, BatTrgAmp=0.0, MaxNegBatAmpsDropped=(-MAX_NEG_NBA_DROPPED);
 float WHtopMaxTemp=170.1,WHtopMinTemp=100.0,WHCenterMinTemp=50.0,WHmaxAnyTemp=178.0;
-int ngp, invMode, selling, buying, sellv=0, invbattv=0, KBLock=0, DropSelected=0, AmpsBelowThresholdWaitSecs=5;
+float MrCoolOnTemp=MR_COOL_ON_TEMP_DEFAULT;
+int vacation=FALSE,ngp, invMode, selling, buying, sellv=0, invbattv=0, KBLock=0, DropSelected=0, AmpsBelowThresholdWaitSecs=5;
 int InverterPwr=0, SellVoltMin=DEFAULT_SELL_V_MIN, SellVoltMax=DEFAULT_SELL_V_MAX, UnderUtilization;
 time_t epoch_time,ResetTime;
 struct tm *tm_p, ResetTime_p;
@@ -337,151 +338,214 @@ static long c=0L, AvHrSOC=0L;
 
 	++c; AvHrVolts+=FNDC_BATT_VOLTS; AvHrSOC+=(long)FNDC_SOC;
 //static enum LockStates InvAuxLockSaved=Undefined;
-  if((tm_p->tm_mday>=11) && (hour>=10)) vacation=FALSE;
+  if ((TimeTest(-1,1,1))&&(PrgDataStruct.SOC_Targ<100)&&(InvChrgEnabled==YES))
+  {				
+		cmdMate("CHG","0",__LINE__);
+		InvChrgEnabled=NO;
+		wprintw(ScrollWin,"Turning charger off at %d:%d\n",hour,minute);
+  }
+  if((tm_p->tm_mday>=32) && (hour>=10)) vacation=FALSE;
   if(vacation==FALSE)
   {
-	if (TimeTest(0,30,0))	setACPS(acpsNone);
-//	5AM
-	if (TimeTest(5,30,0))	AmpsBelowThresholdWaitSecs=25;
-//	7AM
-	if (TimeTest(7,0,0))
+	switch (hour)
 	{
-		if (InvInputMode==GridTied)
-		{	
-			MaxNegBatAmpsDropped=(-40);
-			DropSelected=1;
-			SellVoltMin=504;
-		}
-		SEND_SMS_STAT_RPT
-	}
-
-	if (TimeTest(7,15,0)){
-		whsSetFlags(whsTimer, whsOff);
-		WHCenterMinTemp=50.0;
-		if(WHCenterMinTemp<110.0) WHtopMinTemp=110.0;
-	}
-	
-//8AM Mon,Wed,Fri
+		case 0 	:
+			if (TimeTest(0,30,0))	//setACPS(acpsNone);
+			{
+				MrCoolOnTemp=74.0;
+			}
+			break;
+		case 5	:
+			if (TimeTest(5,30,0))	AmpsBelowThresholdWaitSecs=25;
+			break;
+		case 7	:
+			if (TimeTest(7,0,0))
+			{
+				if (InvInputMode==GridTied)
+				{	
+					MaxNegBatAmpsDropped=(-40);
+					DropSelected=1;
+					SellVoltMin=504;
+				}
+				SEND_SMS_STAT_RPT
+			}
+			if (TimeTest(7,15,0)){
+				whsSetFlags(whsTimer, whsOff);
+				WHCenterMinTemp=50.0;
+				if(WHCenterMinTemp<110.0) WHtopMinTemp=110.0;
+			}
+			break;
+		case 8	:
 /*	if((dow==1) || (dow==3) || (dow==5))*/
-		if(TimeTest(10,1,0))	setACPS(acpsInverter);/*{
+			if(TimeTest(8,1,0))
+			{/*setACPS(acpsInverter);*/
+				BathDone=FALSE;
+				MrCoolOnTemp=MR_COOL_ON_TEMP_DEFAULT;
+			}
+		/*{
 			WHtopMinTemp=125.0;
 			WHCenterMinTemp=125.0;		
 		}
-	*/		
-//10AM
-	if (TimeTest(10,0,0)){
-		AmpsBelowThresholdWaitSecs=5;
-		if (InvInputMode==GridTied)DropSelected=0;
-		SEND_SMS_STAT_RPT
-	}
-	if (TimeTest(12,50,0))WHtopMinTemp=120.0;
-//1:15PM
-	if (TimeTest(13,15,0)){
-		if (WaterHeaterKWH<0.2){
-			whsSetFlags(whsTimer, whsOn);
-		}else{
-			whsSetFlags(whsTimer, whsOff);
-		}
-		if(WHCenterMinTemp<115.0) WHCenterMinTemp=115.0;
-	}
-//2PM
-	if (TimeTest(14,0,0) && (FNDC_SOC<93) && (InvInputMode==GridTied)){
-		if (sellv<508){
-			cmdMate("SELLV","508",__LINE__);
-			sellv=508;
-		}
-		if (SellVoltMin<508){ SellVoltMin=508; }
-		if (MaxNegBatAmpsDropped<(-30)){MaxNegBatAmpsDropped=(-30);}
-		
-	}
-//2:15PM
-	if (TimeTest(14,15,0)){
-		if (WaterHeaterKWH<1.2){
-			whsSetFlags(whsTimer, whsOn);
-		}else{
-			whsSetFlags(whsTimer, whsOff);
-		}
-//		if(ProgramIndx==11 || ProgramIndx==7 || ProgramIndx==3) DischargeAllowed=NO;MaxVNegAmps=0.0;
-	}
-	if (TimeTest(14,30,0))WHtopMinTemp=125.0;
-//3PM
-	if (TimeTest(15,0,0) && (FNDC_SOC<94)  && (InvInputMode==GridTied)){
-		if (sellv<512){
-			cmdMate("SELLV","512",__LINE__);
-			sellv=512;
-		}
-		if (SellVoltMin<512){ SellVoltMin=512; }
-		if (MaxNegBatAmpsDropped<(-25)){MaxNegBatAmpsDropped=(-25);}
-	}
-	
-//	if (TimeTest(15,0,0))
-//3:15PM
-	if (TimeTest(15,15,0)){
-		if (WaterHeaterKWH<2.2){
-			whsSetFlags(whsTimer, whsOn);
-		}else{
-			whsSetFlags(whsTimer, whsOff);
-		}
-		SEND_SMS_STAT_RPT
-	}
-//4PM
-	if (TimeTest(16,0,0) && (FNDC_SOC<95) && (InvInputMode==GridTied)){
-		if (sellv<516){
-			cmdMate("SELLV","516",__LINE__);
-			sellv=516;
-		}
-		if (SellVoltMin<516){ SellVoltMin=516; }
-		if (MaxNegBatAmpsDropped<(-20)){MaxNegBatAmpsDropped=(-20);}
-	}
-//4:15PM
-	if (TimeTest(16,15,0) /*&& InvAuxLockSaved!=Undefined*/){
-		whsSetFlags(whsTimer, whsOff);
-		SEND_SMS_STAT_RPT
-		if(WHtopMinTemp<135.0) WHtopMinTemp=135.0;
-		if(WHCenterMinTemp<125.0) WHCenterMinTemp=125.0;		
-	}
-//5PM
-	if (TimeTest(17,0,0) && (FNDC_SOC<97) && (InvInputMode==GridTied)){
-		if (sellv<524){
-			cmdMate("SELLV","524",__LINE__);
-			sellv=524;
-		}
-		if (SellVoltMin<524){ SellVoltMin=524; }
-		if (MaxNegBatAmpsDropped<(-10)){MaxNegBatAmpsDropped=(-10);}
-	}
+	*/	
+			break;
+		case 10	:
+			if (TimeTest(10,0,0))
+			{
+				AmpsBelowThresholdWaitSecs=5;
+				if (InvInputMode==GridTied)DropSelected=0;
+				SEND_SMS_STAT_RPT
+			}
+		case 12	:
+			if (TimeTest(12,50,0))WHtopMinTemp=120.0;
+			break;
+		case 13	:
+			if (TimeTest(13,15,0))
+			{
+				if (WaterHeaterKWH<0.2)
+				{
+					whsSetFlags(whsTimer, whsOn);
+				}
+				else
+				{
+					whsSetFlags(whsTimer, whsOff);
+				}
+				if(WHCenterMinTemp<115.0) WHCenterMinTemp=115.0;
+			}
+			break;
+		case 14	:
+			if (TimeTest(14,0,0) && (FNDC_SOC<93) && (InvInputMode==GridTied))
+			{
+				if (sellv<508)
+				{
+					cmdMate("SELLV","508",__LINE__);
+					sellv=508;
+				}
+				if (SellVoltMin<508){ SellVoltMin=508; }
+				if (MaxNegBatAmpsDropped<(-30)){MaxNegBatAmpsDropped=(-30);}
+			}
+			if (TimeTest(14,15,0))
+			{
+				if (WaterHeaterKWH<1.2)
+				{
+					whsSetFlags(whsTimer, whsOn);
+				}
+				else
+				{
+					whsSetFlags(whsTimer, whsOff);
+				}
+			}
+			if (TimeTest(14,30,0))WHtopMinTemp=125.0;
+			break;
+		case 15	:
+			if (TimeTest(15,0,0) && (FNDC_SOC<94)  && (InvInputMode==GridTied))
+			{
+				if (sellv<512)
+				{
+					cmdMate("SELLV","512",__LINE__);
+					sellv=512;
+				}
+				if (SellVoltMin<512){ SellVoltMin=512; }
+				if (MaxNegBatAmpsDropped<(-25)){MaxNegBatAmpsDropped=(-25);}
+			}	
+			if (TimeTest(15,15,0))
+			{
+				if (WaterHeaterKWH<2.2)
+				{
+					whsSetFlags(whsTimer, whsOn);
+				}
+				else
+				{
+					whsSetFlags(whsTimer, whsOff);
+				}
+				SEND_SMS_STAT_RPT
+				if(WHtopMinTemp<140.0) WHtopMinTemp=140.0;
+				if(WHCenterMinTemp<125.0) WHCenterMinTemp=125.0;		
+			}
+			break;
+		case 16	:
+			if (TimeTest(16,0,0) && (FNDC_SOC<95) && (InvInputMode==GridTied))
+			{
+				if (sellv<516)
+				{
+					cmdMate("SELLV","516",__LINE__);
+					sellv=516;
+				}
+				if (SellVoltMin<516){ SellVoltMin=516; }
+				if (MaxNegBatAmpsDropped<(-20)){MaxNegBatAmpsDropped=(-20);}
+			}
+			if (TimeTest(16,15,0) /*&& InvAuxLockSaved!=Undefined*/)
+			{
+				whsSetFlags(whsTimer, whsOff);
+				SEND_SMS_STAT_RPT
+			}
+			if (TimeTest(16,45,0) /*&& InvAuxLockSaved!=Undefined*/)
+			{
+				if(BathDone==FALSE)
+				{
+				digitalWrite(WH_LOWER_ELEMENT_SRC,0);	//high volt mechanical thermostat src from grid
+				wprintw(ScrollWin,"Lower WH element on grid\n");
+				}
+			}
+			break;
+		case 17	:
+			if (TimeTest(17,0,0) && (FNDC_SOC<97) && (InvInputMode==GridTied)){
+				if (sellv<524)
+				{
+					cmdMate("SELLV","524",__LINE__);
+					sellv=524;
+				}
+				if (SellVoltMin<524){ SellVoltMin=524; }
+				if (MaxNegBatAmpsDropped<(-10)){MaxNegBatAmpsDropped=(-10);}
+			}
+			if (TimeTest(17,15,0))
+			{
+				digitalWrite(WH_LOWER_ELEMENT_SRC,1);	//low volt managed src from inverter
+				wprintw(ScrollWin,"Lower WH element on inverter\n");
+			}
+			break;
+		case 18	:
 //6PM
-	if (TimeTest(18,0,0) && (InvInputMode==GridTied)){
-		whsSetFlags(whsTimer, whsOff);
-		if (sellv<528){
-			cmdMate("SELLV","528",__LINE__);
-			sellv=528;
-		}
-		if (SellVoltMin<548){ SellVoltMin=548; }
-		MaxNegBatAmpsDropped=(0);
-	}
+			if (TimeTest(18,0,0) && (InvInputMode==GridTied))
+			{
+				whsSetFlags(whsTimer, whsOff);
+				if (sellv<528)
+				{
+					cmdMate("SELLV","528",__LINE__);
+					sellv=528;
+				}
+				if (SellVoltMin<548){ SellVoltMin=548; }
+				MaxNegBatAmpsDropped=(0);
+			}
 //6:15PM
-	if (TimeTest(18,15,0)){
-		whsSetFlags(whsTimer, whsOff);
-		WHCenterMinTemp=50.0;
-		if(WHtopMinTemp>115.0) WHtopMinTemp=115.0;
-	}	
-	if (TimeTest(21,0,33))
-	{
-		if (FNDC_SOC>95)//(InvChrgEnabled!=YES)
-		{
-			whsSetFlags(whsAuto,whsOff);
-			cmdMate("AC1INLM","45",__LINE__);
-			cmdMate("CHG","2",__LINE__);
-			cmdMate("BULK","1",__LINE__);
-			InvChrgEnabled=YES;
-		}
+			if (TimeTest(18,15,0))
+			{
+				whsSetFlags(whsTimer, whsOff);
+				WHCenterMinTemp=50.0;
+				if(WHtopMinTemp>115.0) WHtopMinTemp=115.0;
+			}	
+			break;
+		case 21	:
+			if (TimeTest(21,0,33))
+			{
+				if (FNDC_SOC>95)//(InvChrgEnabled!=YES)
+				{
+					whsSetFlags(whsAuto,whsOff);
+					cmdMate("AC1INLM","45",__LINE__);
+					cmdMate("CHG","2",__LINE__);
+					cmdMate("BULK","1",__LINE__);
+					InvChrgEnabled=YES;
+				}
+			}
+			break;
+		case 22	:
+			if (TimeTest(22,0,0))
+			{
+				whsSetFlags(whsTimer, whsOff);
+				WHCenterMinTemp=50.0;
+				if(WHtopMinTemp>100.0) WHtopMinTemp=100.0;
+			}
+			break;
 	}
-	if (TimeTest(22,0,0)){
-		whsSetFlags(whsTimer, whsOff);
-		WHCenterMinTemp=50.0;
-		if(WHtopMinTemp>100.0) WHtopMinTemp=100.0;
-	}
-
 //Email Report broken on this pc
 	if (TimeTest(28,58,30)){
 		sprintf(strtmp,"Hr:%d V:%3.1f | SOC:%d | WH:%5.3f | Buy:%2.0f | IKWH:%2.0f | KWH %4.1f %4.1f %4.1f | Drp Min %4d | Outage Min %4d | Underutilization Min %4d | In %5.2f Out %5.2f | SOC S %3d E %3d"
@@ -847,7 +911,9 @@ static int weight=0, trigger=20000;
 	}
 }
 
-#define SWITCH_TO_GRID(PAUSE)	if (FNDC_BATT_VOLTS<54.0){cmdMate("AC","1",__LINE__); whsSetFlags(whsAuto,whsOff); \
+#define SWITCH_TO_GRID(PAUSE)	if (((FNDC_BATT_VOLTS<54.0)&&((vacation==FALSE)||(hour>=15)||(FNDC_SOC<90)))|| \
+									(FNDC_BATT_VOLTS<46.0)||(FNDC_SHUNT_A_AMPS<(-200))) \
+										{cmdMate("AC","1",__LINE__); /*whsSetFlags(whsAuto,whsOff);*/ \
 										cmdMate("AC1INLM","45",__LINE__);SavedSOC=0; pause=PAUSE;BelowSellvSecs=0;}
 #define BELOWSELLVSECSTRIG	(-300)
 #define BELOWSELLVSECSMAX	1200
@@ -940,10 +1006,17 @@ int SOC=(int)((((float)BATT_STATUS_AH+ (float)BatRatedAmpHr)/(float)BatRatedAmpH
 	}
 }
 
+void mrCool(void)
+{
+	if((sensor[6].tempF<=MrCoolOffTemp) && (PrgDataStruct.SOC_Targ >= FNDC_SOC)) setACPS(acpsNone);
+	if((sensor[6].tempF>=MrCoolOnTemp)&&(AirCondPwrSrc==acpsNone)) setACPS(acpsOn);
+}
+
 void think(void){
 static int pause=0, ContinousNegAmpsSec=0, DetectChrgEnabledSecs=0;
 int CC1Mode=CC1_MODE, CC2Mode=CC2_MODE;
 	if (initilized!=YES) init();
+	mrCool();
 	if (INVERTER_OP_MODE==IOM_CHRG){
 		if (InvChrgEnabled!=YES){
 			if (DetectChrgEnabledSecs++ >= 5){ 
@@ -958,7 +1031,8 @@ int CC1Mode=CC1_MODE, CC2Mode=CC2_MODE;
 	{
 		if (InvChrgEnabled==YES)
 		{
-			if (((CC1_PVIV>50) || (CC2_PVIV>50)) && (FNDC_BATT_VOLTS>ChargeDisableTrigV))
+			enum CC_Modes CC_Mode1=CC1_MODE,CC_Mode2=CC2_MODE;
+			if ((((CC1_PVIV>50)&&(CC_Mode1!=Silent)) || ((CC2_PVIV>50)&&(CC_Mode2!=Silent))) && (FNDC_BATT_VOLTS>ChargeDisableTrigV))
 			{
 				cmdMate("CHG","0",__LINE__);
 				InvChrgEnabled=NO;
@@ -1159,6 +1233,9 @@ void ProcessUserInput(void){
 			case 'b':
 				cmdMate("BTEMP","?",__LINE__);
 				break;
+			case 'B':
+				BathDone=TRUE;
+				break;
 			case 'C':
 				ChargeDisableTrigV+=1.0;
 				if (InvChrgEnabled!=YES){
@@ -1348,6 +1425,20 @@ void ProcessUserInput(void){
 			case	'$':
 				digitalWrite(MRCOOL2KHP_SRC_GPIO,0);
 				break;
+			case	'(':
+				vacation=TRUE;wprintw(ScrollWin,"vacation=TRUE\n");
+				break;
+			case	')'	:
+				vacation=FALSE;
+				break;
+			case	':'	:
+				digitalWrite(WH_LOWER_ELEMENT_SRC,1);	//low volt managed src from inverter
+				wprintw(ScrollWin,"Lower WH element on inverter\n");
+				break;
+			case	';'	:
+				digitalWrite(WH_LOWER_ELEMENT_SRC,0);	//high volt mechanical thermostat src from grid
+				wprintw(ScrollWin,"Lower WH element on grid\n");
+				break;
 			}
 		}
 }
@@ -1362,8 +1453,8 @@ void printStuff(void){
 	WMVPRINTW(InvWin,5,2,"Buy   %2d %2d %6.3f ",L1_BUY_AMPS,L2_BUY_AMPS,BuyWH/1000);
 	WMVPRINTW(InvWin,6,2,"Sell  %2d %2d %6.3f",L1_SELL_AMPS,L2_SELL_AMPS,SellWH/1000);
 	WMVPRINTW(InvWin,7,2,"NetGP %5d %s Watts",ngp,(ngp>0) ? "$$$":"   ");
-	WMVPRINTW(InvWin,8,2,"Aux  %2d%2d%2d %2d",(digitalRead(WH_UPPER_ELEMENT)), (digitalRead(WH_LOWER_ELEMENT_HV))
-													,(digitalRead(WH_LOWER_ELEMENT)!=0),(INVERTER_AUX_OUT!=0));
+	WMVPRINTW(InvWin,8,2,"Aux  %2d%2d%2d %2d %2d",(digitalRead(WH_UPPER_ELEMENT)), (digitalRead(WH_LOWER_ELEMENT_HV))
+													,(digitalRead(WH_LOWER_ELEMENT)!=0),(INVERTER_AUX_OUT!=0),(vacation));
 	WMVPRINTW(InvWin,9,1,"InvPwr %5d %6.3f ", InverterPwr, InvWH/1000);
 	WMVPRINTW(InvWin,10,1,"SelV %3.1f >=%3.1f<=%3.1f",(float)sellv / 10.0,(float) SellVoltMin/10.0,(float) SellVoltMax/10.0);
 	WMVPRINTW(InvWin,11,1,"Mode %d %8s",InvInputMode,InvInputModeLabels[InvInputMode]);
@@ -1391,17 +1482,21 @@ void printStuff(void){
 	WMVPRINTW(CCWin,11,2,"   %5.1f        >%3.0f",readSensorF(2,666.6),WHtopMinTemp);									
 	WMVPRINTW(CCWin,12,2,"%5.1f %5.1f  %s >%3.0f", readSensorF(4,666.6),readSensorF(1,666.6)
 									,(digitalRead(WH_UPPER_ELEMENT) ? "^ " : "  "), WHCenterMinTemp);
-	WMVPRINTW(CCWin,13,2,"   %5.1f  %3s%s      ",readSensorF(0,666.6)
+	WMVPRINTW(CCWin,13,2,"   %5.1f  %3s%s %5.1f",readSensorF(0,666.6)
 											,((digitalRead(WH_LOWER_ELEMENT_HV) && digitalRead(WH_LOWER_ELEMENT)) ? "^^^" : "  ")
-											,(digitalRead(WH_LOWER_ELEMENT) ? "^ " : "  "));
+											,(digitalRead(WH_LOWER_ELEMENT) ? "^ " : "  "),readSensorF(7,777.7));
 //	WMVPRINTW(CCWin,13,1,"%5.1f %5.1f %5.1f %5.1f",sensor[0].tempF,sensor[1].tempF,sensor[2].tempF,sensor[4].tempF);
 	WMVPRINTW(FNDCWin,0,2,"BattV %3.1f ",FNDC_BATT_VOLTS);
 	WMVPRINTW(FNDCWin,1,2,"SOC   %3d%% ",FNDC_SOC);
 	WMVPRINTW(FNDCWin,2,2,"Amps %5.1f %5.1f %5.1f  ",FNDC_SHUNT_A_AMPS,FNDC_SHUNT_B_AMPS,FNDC_SHUNT_C_AMPS);
 	WMVPRINTW(FNDCWin,3,2,"Net Amps%6.1f             ",netbattamps);
 	WMVPRINTW(FNDCWin,4,2,"InvOut/In %6.1f%% ",(INVPWR/((0-FNDC_SHUNT_A_AMPS)*FNDC_BATT_VOLTS))*100);
-	if (InvInputMode != GridTied) WMVPRINTW(FNDCWin,6,2,"ACPS %4s S %d P %d",acpsModeDesc[AirCondPwrSrc],
+	if (InvInputMode != GridTied)
+	{ 
+		WMVPRINTW(FNDCWin,5,18,"%4d",AC1InLimit);
+		WMVPRINTW(FNDCWin,6,2,"ACPS %4s S %d P %d",acpsModeDesc[AirCondPwrSrc],
 						digitalRead(MRCOOL2KHP_SRC_GPIO),digitalRead(MRCOOL2KHP_PWR_GPIO));
+	}
 	WMVPRINTW(FNDCWin,7,1,"MaxNegA Dropped %5.1f ",MaxNegBatAmpsDropped);
 	WMVPRINTW(FNDCWin,8,2,"KB Locked %s ",((KBLock) ? "Yes Press ^":"No Press L "));
 	WMVPRINTW(FNDCWin,10,2,"%s         ","  ");
@@ -1485,6 +1580,7 @@ int main( int argc, char *argv[])
 	pinMode(AIR_COND_GPIO_PIN,OUTPUT);
 	pinMode(WH_LOWER_ELEMENT,OUTPUT);
 	pinMode(WH_LOWER_ELEMENT_HV,OUTPUT);
+	pinMode(WH_LOWER_ELEMENT_SRC,OUTPUT);
 	pinMode(WH_UPPER_ELEMENT,OUTPUT);
 	pinMode(MRCOOL2KHP_PWR_GPIO,OUTPUT);
 	pinMode(MRCOOL2KHP_SRC_GPIO,OUTPUT);
