@@ -1008,7 +1008,7 @@ int SOC=(int)((((float)BATT_STATUS_AH+ (float)BatRatedAmpHr)/(float)BatRatedAmpH
 
 void mrCool(void)
 {
-	if((sensor[6].tempF<=MrCoolOffTemp) && (PrgDataStruct.SOC_Targ >= FNDC_SOC)) setACPS(acpsNone);
+	if((sensor[6].tempF<=MrCoolOffTemp) && ((PrgDataStruct.SOC_Targ >= FNDC_SOC)||((CC1_AMPS+CC2_AMPS)<15))) setACPS(acpsNone);
 	if((sensor[6].tempF>=MrCoolOnTemp)&&(AirCondPwrSrc==acpsNone)) setACPS(acpsOn);
 }
 
