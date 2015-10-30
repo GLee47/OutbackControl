@@ -702,11 +702,13 @@ static int pau=0;//pause for adjusting sell voltage
 	}
 	if (Selling>5){Selling=0; DROP_GRID(5,((PrgDataStruct.SOC_Targ>99)?125:((DischargeAllowed==YES)?20:5)))}
 	if (INVERTER_OP_MODE==IOM_OFFSET){
-		if (AC1InLimit < (BuyCurMax + 3)){
-			AC1InLimit = (BuyCurMax + 3);
+		if (AC1InLimit < (BuyCurMax + 2)&&(pause<1)){
+			AC1InLimit = (BuyCurMax + 2);
 			sprintf(strtmp,"%d",AC1InLimit);
 			cmdMate("AC1INLM",strtmp,__LINE__);//raising limit
-			WMVPRINTW(FNDCWin,5,2,"AC1InLimit %4d   ",AC1InLimit);				
+			WMVPRINTW(FNDCWin,5,2,"AC1InLimit %4d   ",AC1InLimit);	
+			pause=20;//10/27/2015
+			return;	//10/27/2015		
 		} 
 		pause=5; 
 	}	
@@ -731,8 +733,11 @@ static int pau=0;//pause for adjusting sell voltage
 	AdjustedSellV=(((int)((AdjustedSellV+(4/2))/4.0))*4);//round to nearest voltage resoultion for radian - 0.4v
 	if (AdjustedSellV!=sellv){
 		if (pau<1){
-			ADJ_SELLV(AdjustedSellV);
-			pau=60;//don't change but once a minute
+			if((DischargeAllowed!=NO)||(AdjustedSellV>sellv))//10/27/2015
+			{
+				ADJ_SELLV(AdjustedSellV);
+				pau=60;//don't change but once a minute
+			}
 		}
 	}
 	if (PrgDataStruct.SOC_Targ>99){

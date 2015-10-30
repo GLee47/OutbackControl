@@ -45,8 +45,8 @@
 #define AIR_COND_GPIO_PIN		5	/* frount window unit on/off */
 #define MRCOOL2KHP_PWR_GPIO		22	/*Mr Cool great room pwr high on/low off (src must be inverter to turn off i.e. pin 22 high) */
 #define	MRCOOL2KHP_SRC_GPIO		17	/*Mr Cool great room power sorce - high is inverter, low is grid */
-#define MrCoolOffTemp			68.5
-#define MR_COOL_ON_TEMP_DEFAULT	69.5	
+#define MrCoolOffTemp			69.3
+#define MR_COOL_ON_TEMP_DEFAULT	69.9	
 
 //#define WATERHEATEROFF	digitalRead(WH_LOWER_ELEMENT)
 //#define WATERHEATERON	if (INVERTER_AUX_OUT==0){cmdMate("AUXON","1");}
