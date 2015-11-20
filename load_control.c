@@ -13,6 +13,7 @@ extern void compressor(int SwOn);
 extern WINDOW * InvWin,* CCWin,* FNDCWin,* ScrollWin;
 extern struct tm *tm_p;
 extern bool preferHeatPumpOn;
+extern void SoundAlarm(int ms);
 
 #define	MAX_LOAD_AMPS	34
 #define LOWER_HV_L1_DIFF	20
@@ -196,6 +197,7 @@ void loadShed(void)
 			NeedToShedAmpsL1-= COMPRESSOR_L1_DIFF;
 			EstL1A-= COMPRESSOR_L1_DIFF;
 			lcDelay=DEFAULT_DELAY;
+			SoundAlarm(100);
 		}	
 		if((NeedToShedAmpsL1>0) && (digitalRead(AIR_COND_GPIO_PIN)==ON))//this is the window unit in old living room
 		{
@@ -238,16 +240,20 @@ void loadShed(void)
 	}
 	if(lcDelay==0) LoadControl();
 }
+
+#define TURN_LE_ON {digitalWrite(WH_LOWER_ELEMENT_SRC,1);digitalWrite(WH_LOWER_ELEMENT,ON);}
 	
 void LoadControl(void)
 {
-	int overTemp=(MAX(MAX(TEMPSENSOR(TOP),TEMPSENSOR(BOTTOM)),MAX(TEMPSENSOR(CENTER_RIGHT),TEMPSENSOR(CENTER_LEFT))) > WHMAXTEMP);
+	int overTemp=(MAX(MAX(TEMPSENSOR(TOP),TEMPSENSOR(BOTTOM)),MAX(TEMPSENSOR(CENTER_RIGHT),TEMPSENSOR(CENTER_LEFT))) > 
+			MAX(WHMAXTEMP,MAX(WHtopMinTemp+1,WHCenterMinTemp+1)));
 	float midTankTemp=MAX(TEMPSENSOR(CENTER_RIGHT),TEMPSENSOR(CENTER_LEFT));
 	enum inRange topTank=(TEMPSENSOR(TOP) < WHtopMinTemp ? irBelow : ((TEMPSENSOR(TOP) > WHtopMaxTemp) ? irAbove :irIn));
 	enum inRange midTank=(midTankTemp < WHCenterMinTemp ? irBelow : (midTankTemp > WHMAXTEMP ? irAbove :irIn));
 	static enum InverterACModes lastIACMode=iacmNoGr;
 //	wprintw(ScrollWin,"%d %d %d %d\n",INVERTER_AUX_OUT,TOT_LOAD(L2),COMPRESSOR_L2_DIFF,MAX_LOAD_AMPS);
 //	wprintw(ScrollWin,"%5.1f %5.1f %d %d\n",netbattamps, DCamps(LOWER_LV_L2_DIFF),(digitalRead(WH_LOWER_ELEMENT)==OFF),midTank);
+	if(TEMPSENSOR(TOP) > WHMAXTEMP) digitalWrite(WH_LOWER_ELEMENT_SRC,1);
 	if(INVERTER_AUX_OUT==0)
 	{
 		if((TOT_LOAD(L1) + COMPRESSOR_L1_DIFF) < MAX_LOAD_AMPS)
@@ -277,7 +283,7 @@ void LoadControl(void)
 			digitalWrite(WH_LOWER_ELEMENT_HV,OFF); wprintw(ScrollWin,"LC @ %d\n",__LINE__);
 			usleep(35000);
 		}
-		digitalWrite(WH_LOWER_ELEMENT,ON);
+		TURN_LE_ON;//digitalWrite(WH_LOWER_ELEMENT,ON);
 		lcDelay=DEFAULT_DELAY; wprintw(ScrollWin,"LC @ %d\n",__LINE__);
 		return;
 	}
@@ -348,7 +354,7 @@ void LoadControl(void)
 			}
 			if(digitalRead(WH_LOWER_ELEMENT)!=ON)
 			{
-				digitalWrite(WH_LOWER_ELEMENT,ON);
+				TURN_LE_ON;//digitalWrite(WH_LOWER_ELEMENT,ON);
 				lcDelay=DEFAULT_DELAY; wprintw(ScrollWin,"LC @ %d\n",__LINE__);
 				return;
 			}			
@@ -399,7 +405,7 @@ void LoadControl(void)
 			if((digitalRead(WH_LOWER_ELEMENT)==OFF) && ((EstL2A+LOWER_LV_L2_DIFF) <= MAX_LOAD_AMPS))
 			{
 				wprintw(ScrollWin,"LC @ %d\n",__LINE__);
-				digitalWrite(WH_LOWER_ELEMENT,ON); 
+				TURN_LE_ON;//digitalWrite(WH_LOWER_ELEMENT,ON); 
 			}
 		}
 		if(vacation==TRUE)setACPS(acpsNone);
@@ -460,7 +466,7 @@ void LoadControl(void)
 				usleep(35000);
 			}
 			if (!overTemp){
-				digitalWrite(WH_LOWER_ELEMENT,ON);
+				TURN_LE_ON;//digitalWrite(WH_LOWER_ELEMENT,ON);
 				lcDelay=DEFAULT_DELAY; wprintw(ScrollWin,"LC @ %d LE_ON %4.2f %4.2f\n",__LINE__,FNDC_BATT_VOLTS,
 							MAX(50.8+ MAX(0,((TEMPSENSOR(CENTER_LEFT)-LE_SETPOINT_START)/LE_DIVISOR)),MIN(57,fSellV+0.8)));
 				return;

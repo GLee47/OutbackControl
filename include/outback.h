@@ -38,6 +38,7 @@
 #define MIN_VOLTS_DROPPED 44.8
 #define MAX_NEG_NBA_DROPPED	20
 //pins
+#define PIN_ALARM				25
 #define WH_LOWER_ELEMENT		26  /* BCM pin# */ 
 #define WH_LOWER_ELEMENT_HV		12  /* BCM pin# */ 
 #define WH_LOWER_ELEMENT_SRC	27	/* BCM pin# */
@@ -47,6 +48,8 @@
 #define	MRCOOL2KHP_SRC_GPIO		17	/*Mr Cool great room power sorce - high is inverter, low is grid */
 #define MrCoolOffTemp			69.3
 #define MR_COOL_ON_TEMP_DEFAULT	69.9	
+#define MrHeatOffTemp			70.0
+#define MR_HEAT_ON_TEMP_DEFAULT	69.4	
 
 //#define WATERHEATEROFF	digitalRead(WH_LOWER_ELEMENT)
 //#define WATERHEATERON	if (INVERTER_AUX_OUT==0){cmdMate("AUXON","1");}
