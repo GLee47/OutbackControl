@@ -91,8 +91,9 @@ int AC1InLimit=45, BatTrgV=512, SOCstart=100;
 float BatAmpHrIn=0.0, BatAmpHrOut=0.0, BatAmpHrCrx=0.0, MaxVNegAmps=0.0,BattEffFac=0.91,ChargeDisableTrigV=51.0;
 float SellWH,BuyWH,InvWatts,InvWH, netbattamps=0.0, BatTrgAmp=0.0, MaxNegBatAmpsDropped=(-MAX_NEG_NBA_DROPPED);
 float WHtopMaxTemp=180.1,WHtopMinTemp=100.0,WHCenterMinTemp=50.0,WHmaxAnyTemp=180.0;
-float MrCoolOnTemp=MR_COOL_ON_TEMP_DEFAULT,MrHeatOnTemp=MR_HEAT_ON_TEMP_DEFAULT;
-int MrCoolMode=1;
+float MrCoolOnTemp=MR_COOL_ON_TEMP_DEFAULT,MrHeatOnTemp=MR_HEAT_ON_TEMP_DEFAULT,MC_On_Temp=70.1,MC_Off_Temp=70.0;
+//int MrCoolMode=1;
+#define MrCoolMode	((MC_On_Temp>MC_Off_Temp)?1:0)
 int vacation=FALSE,ngp, invMode, selling, buying, sellv=0, invbattv=0, KBLock=0, DropSelected=0, AmpsBelowThresholdWaitSecs=5;
 int InverterPwr=0, SellVoltMin=DEFAULT_SELL_V_MIN, SellVoltMax=DEFAULT_SELL_V_MAX, UnderUtilization;
 time_t epoch_time,ResetTime;
@@ -405,7 +406,7 @@ static long c=0L, AvHrSOC=0L;
 				SEND_SMS_STAT_RPT
 			}
 		case 12	:
-			if (TimeTest(12,50,0))WHtopMinTemp=120.0;
+			if (TimeTest(12,50,0)&&(BathDone==FALSE))WHtopMinTemp=120.0;
 			break;
 		case 13	:
 			if (TimeTest(13,15,0))
@@ -443,7 +444,7 @@ static long c=0L, AvHrSOC=0L;
 					whsSetFlags(whsTimer, whsOff);
 				}*/
 			}
-			if (TimeTest(14,30,0))WHtopMinTemp=125.0;
+			if (TimeTest(14,30,0)&&(BathDone==FALSE))WHtopMinTemp=125.0;
 			break;
 		case 15	:
 			if (TimeTest(15,0,0) && (FNDC_SOC<94)  && (InvInputMode==GridTied))
@@ -584,7 +585,7 @@ static long c=0L, AvHrSOC=0L;
 		IAO_Day_Secs=0;	IAR_Day_Secs=0;
 		DroppedSecs=0;
 		UnderUtilizationSecs=0;
-		DischargeAllowed=YES;MaxVNegAmps=0.0;
+		if(ProgramIndx!=6){DischargeAllowed=YES;MaxVNegAmps=0.0;}
 //		whsSetFlags(whsTimer, whsOff);
 	}
 // on the half minute
@@ -1025,18 +1026,18 @@ int SOC=(int)((((float)BATT_STATUS_AH+ (float)BatRatedAmpHr)/(float)BatRatedAmpH
 		}
 	}
 }
-
+#define MCRoomTemp	((sensor[6].tempF+sensor[5].tempF)/2)
 void mrCool(void)
-{
-	if(MrCoolMode==1)
+{//MC_On_Temp+=0.25;
+	if(MrCoolMode==1)//1 is cool
 	{
-		if((sensor[6].tempF<=MrCoolOffTemp) && ((PrgDataStruct.SOC_Targ >= FNDC_SOC)||((CC1_AMPS+CC2_AMPS)<15))) setACPS(acpsNone);
-		if((sensor[6].tempF>=MrCoolOnTemp)&&(AirCondPwrSrc==acpsNone)) setACPS(acpsOn);
+		if((MCRoomTemp<=MC_Off_Temp) && ((PrgDataStruct.SOC_Targ >= FNDC_SOC)||((CC1_AMPS+CC2_AMPS)<15))) setACPS(acpsNone);
+		if((MCRoomTemp>=MC_On_Temp)&&(AirCondPwrSrc==acpsNone)) setACPS(acpsOn);
 	}
-	else
+	else //0 is heat
 	{
-		if((sensor[6].tempF>=MrHeatOffTemp) && ((PrgDataStruct.SOC_Targ >= FNDC_SOC)||((CC1_AMPS+CC2_AMPS)<15))) setACPS(acpsNone);
-		if((sensor[6].tempF<=MrHeatOnTemp)&&(AirCondPwrSrc==acpsNone)) setACPS(acpsOn);
+		if((MCRoomTemp>=MC_Off_Temp) && ((PrgDataStruct.SOC_Targ >= FNDC_SOC)||((CC1_AMPS+CC2_AMPS)<15))) setACPS(acpsNone);
+		if((MCRoomTemp<=MC_On_Temp)&&(AirCondPwrSrc==acpsNone)) setACPS(acpsOn);
 	}
 }
 
@@ -1327,10 +1328,12 @@ void ProcessUserInput(void){
 				WHpowerLevel(1);
 				break;
 			case 'K':
-				MrCoolMode=1;//cool
+				//MrCoolMode=1;//cool
+				MC_On_Temp+=0.25;
 				break;
 			case 'k':
-				MrCoolMode=0;//heat
+				//MrCoolMode=0;//heat
+				MC_On_Temp-=0.25;
 				break;				
 			case 'L':	//lock the keyboard
 				KBLock=1;
@@ -1408,7 +1411,13 @@ void ProcessUserInput(void){
 				break;
 			case 'z': // Discharge Is Allowed
 				DischargeAllowed=YES;MaxVNegAmps=0.0;
-				break;			
+				break;	
+			case 'X':	
+				MC_Off_Temp+=0.25;
+				break;
+			case 'x':
+				MC_Off_Temp-=0.25;	
+				break;
 			case '+':
 				cmdMate("SELLV","+",__LINE__);
 				sellv+=4;
@@ -1491,7 +1500,8 @@ void printStuff(void){
 	WMVPRINTW(InvWin,10,1,"SelV %3.1f >=%3.1f<=%3.1f",(float)sellv / 10.0,(float) SellVoltMin/10.0,(float) SellVoltMax/10.0);
 	WMVPRINTW(InvWin,11,1,"Mode %d %8s",InvInputMode,InvInputModeLabels[InvInputMode]);
 	WMVPRINTW(InvWin,12,1,"room temp %4.1f      ",/*sensor[3].tempF*/readSensorF(3,-666.9));
-	WMVPRINTW(InvWin,13,1,"atic temp %4.1f      ",/*sensor[5].tempF*/readSensorF(5,-666.9));
+	WMVPRINTW(InvWin,12,1,"Wall %5.1f atic %5.1f %1s ",sensor[6].tempF,readSensorF(5,-666.9),((MrCoolMode==1)?"C":"H"));
+	WMVPRINTW(InvWin,13,1,"On %4.1f Off %4.1f %1s    ",/*sensor[5].tempF*/MC_On_Temp,MC_Off_Temp,(MC_On_Temp>MC_Off_Temp)?"C":"H");
 	WMVPRINTW(CCWin,0,2,"BattV  %4.1f %4.1f",CC1_BATT_VOLTS,CC2_BATT_VOLTS);
 	WMVPRINTW(CCWin,1,2,"Prg %1d %s",ProgramIndx,Programs[ProgramIndx]);
 	WMVPRINTW(CCWin,2,2,"KWH    %4.1f %4.1f %4.1f",CC1_KWHH,CC2_KWHH,CC1_KWHH+CC2_KWHH);
@@ -1508,7 +1518,8 @@ void printStuff(void){
 			whsSetFlags(whsConserve,whsInquiry), whGetDesiredState(**digitalRead(WH_LOWER_ELEMENT),INVERTER_AUX_OUT,*/
 /*			(L1_INVERTER_AMPS+L1_CHARGER_AMPS+L1_BUY_AMPS-L1_SELL_AMPS),
 			(L2_INVERTER_AMPS+L2_CHARGER_AMPS+L2_BUY_AMPS-L2_SELL_AMPS)),digitalRead(WH_UPPER_ELEMENT));*/
-	WMVPRINTW(CCWin,9,2,"Living F%5.1f %1s",sensor[6].tempF,((MrCoolMode==1)?"C":"H"));
+//	WMVPRINTW(CCWin,9,2,"Living F%5.1f %1s",sensor[6].tempF,((MrCoolMode==1)?"C":"H"));
+	WMVPRINTW(CCWin,9,2,"Ctrl Rm %4.1f      ",readSensorF(3,-666.9));
 	WMVPRINTW(CCWin,10,2,"%02d:%02d:%02d  %02d:%02d:%02d",hour,minute,second,ResetTime_p.tm_hour,ResetTime_p.tm_min
 															,ResetTime_p,ResetTime_p.tm_sec);
 	WMVPRINTW(CCWin,11,2,"   %5.1f        >%3.0f",readSensorF(2,666.6),WHtopMinTemp);									
