@@ -558,6 +558,8 @@ static long c=0L, AvHrSOC=0L;
 //				whsSetFlags(whsTimer, whsOff);
 				WHCenterMinTemp=50.0;
 				if(WHtopMinTemp>100.0) WHtopMinTemp=100.0;
+				cmdMate("CHG","0",__LINE__);
+				InvChrgEnabled=NO;
 			}
 			break;
 	}
@@ -916,7 +918,7 @@ static int weight=0, trigger=20000;
 			weight=0;
 		}	
 	}
-	WMVPRINTW(FNDCWin,6,2,"T %5d W %7d",TargetGPUse,weight);
+	WMVPRINTW(FNDCWin,5,2,"T %5d W %7d",TargetGPUse,weight);
 	if ((DropSelected) && ((FNDC_SOC)>(MIN_SOC_DROPPED))){
 	static int tmr=0;
 		if (((MaxNegBatAmpsDropped)*INVEFF) < (netbattamps-((ngp*10)/invbattv))){
@@ -1026,7 +1028,7 @@ int SOC=(int)((((float)BATT_STATUS_AH+ (float)BatRatedAmpHr)/(float)BatRatedAmpH
 		}
 	}
 }
-#define MCRoomTemp	((sensor[6].tempF+sensor[5].tempF)/2)
+#define MCRoomTemp	((sensor[6].tempF+sensor[5].tempF)/2.0)
 void mrCool(void)
 {//MC_On_Temp+=0.25;
 	if(MrCoolMode==1)//1 is cool
@@ -1534,12 +1536,9 @@ void printStuff(void){
 	WMVPRINTW(FNDCWin,2,2,"Amps %5.1f %5.1f %5.1f  ",FNDC_SHUNT_A_AMPS,FNDC_SHUNT_B_AMPS,FNDC_SHUNT_C_AMPS);
 	WMVPRINTW(FNDCWin,3,2,"Net Amps%6.1f             ",netbattamps);
 	WMVPRINTW(FNDCWin,4,2,"InvOut/In %6.1f%% ",(INVPWR/((0-FNDC_SHUNT_A_AMPS)*FNDC_BATT_VOLTS))*100);
-	if (InvInputMode != GridTied)
-	{ 
-		WMVPRINTW(FNDCWin,5,18,"%4d",AC1InLimit);
-		WMVPRINTW(FNDCWin,6,2,"ACPS %4s S %d P %d",acpsModeDesc[AirCondPwrSrc],
+	if (InvInputMode != GridTied)	WMVPRINTW(FNDCWin,5,18,"%4d",AC1InLimit);
+	WMVPRINTW(FNDCWin,6,2,"ACPS %4s S %d P %d",acpsModeDesc[AirCondPwrSrc],
 						digitalRead(MRCOOL2KHP_SRC_GPIO),digitalRead(MRCOOL2KHP_PWR_GPIO));
-	}
 	WMVPRINTW(FNDCWin,7,1,"MaxNegA Dropped %5.1f ",MaxNegBatAmpsDropped);
 	WMVPRINTW(FNDCWin,8,2,"KB Locked %s ",((KBLock) ? "Yes Press ^":"No Press L "));
 	WMVPRINTW(FNDCWin,10,2,"%s         ","  ");

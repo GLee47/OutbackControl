@@ -14,10 +14,10 @@
 #define FLEXNETDC_V			((float)(metric[4][8]/10.0))
 #define FLEXNETDC_TEMP		((((metric[4][12])-10.0)*(9.0/5.0))+32.0)
 #define AVG_DEV_V			((INVERTER_V+CHAN2_CC_V+CHAN3_CC_V+FLEXNETDC_V)/4)
-#define DISCONNECT_VOLT		52.0
-#define CONNECT_VOLT		48.8
-#define DISC_DELAY_TICKS	330
-#define CONN_DELAY_TICKS	330
+//#define DISCONNECT_VOLT		52.0
+//#define CONNECT_VOLT		48.8
+//#define DISC_DELAY_TICKS	330
+//#define CONN_DELAY_TICKS	330
 #define L1_AAC_BUY			metric[1][5]
 #define L2_AAC_BUY			metric[1][12]
 #define LOOP_V				(FLEXNETDC_V)

@@ -457,7 +457,7 @@ void LoadControl(void)
 		//top >120 or we got more juce them bring up bottom temp
 		if((digitalRead(WH_LOWER_ELEMENT)==OFF) && (midTank != irAbove) && 
 				(((TOT_LOAD(L2)+LOWER_LV_L2_DIFF)< MAX_LOAD_AMPS) || (FNDC_BATT_VOLTS > 56.0)) && 
-				(FNDC_BATT_VOLTS > MAX(50.8 + MAX(0,((TEMPSENSOR(CENTER_LEFT)-LE_SETPOINT_START)/LE_DIVISOR)),MIN(57,fSellV+0.8)/*fSellV+0.4*/)))
+				(FNDC_BATT_VOLTS > MAX(50.8 + MAX(0,((TEMPSENSOR(CENTER_LEFT)-LE_SETPOINT_START)/LE_DIVISOR)),MIN(MAX(fSellV,57),fSellV+0.8)/*fSellV+0.4*/)))
 		{
 			//lower tank temp in range -- turn on lower element, set delay, and return
 			if(digitalRead(WH_LOWER_ELEMENT_HV)==ON)
@@ -468,7 +468,7 @@ void LoadControl(void)
 			if (!overTemp){
 				TURN_LE_ON;//digitalWrite(WH_LOWER_ELEMENT,ON);
 				lcDelay=DEFAULT_DELAY; wprintw(ScrollWin,"LC @ %d LE_ON %4.2f %4.2f\n",__LINE__,FNDC_BATT_VOLTS,
-							MAX(50.8+ MAX(0,((TEMPSENSOR(CENTER_LEFT)-LE_SETPOINT_START)/LE_DIVISOR)),MIN(57,fSellV+0.8)));
+							MAX(50.8+ MAX(0,((TEMPSENSOR(CENTER_LEFT)-LE_SETPOINT_START)/LE_DIVISOR)),MIN(MAX(fSellV,57),fSellV+0.8)));
 				return;
 			}
 		}
@@ -524,7 +524,7 @@ void LoadControl(void)
 	}
 	if((!UnderUtilization) /*&& (netbattamps < 0)*/ && 
 				(((FNDC_BATT_VOLTS<(VACATION_VSET-0.4))&&(vacation==TRUE))||
-				(FNDC_BATT_VOLTS < MAX(50.8+ MAX(0,((TEMPSENSOR(CENTER_LEFT)-LE_SETPOINT_START)/LE_DIVISOR)),MIN(57,fSellV+0.8))))) 
+				(FNDC_BATT_VOLTS < MAX(50.8+ MAX(0,((TEMPSENSOR(CENTER_LEFT)-LE_SETPOINT_START)/LE_DIVISOR)),MIN(MAX(fSellV,57),fSellV+0.8))))) 
 	{
 		if((digitalRead(WH_LOWER_ELEMENT)==ON) && (midTank != irBelow))
 		{
@@ -532,12 +532,12 @@ void LoadControl(void)
 			if(digitalRead(WH_LOWER_ELEMENT_HV)==ON)
 			{
 				digitalWrite(WH_LOWER_ELEMENT_HV,OFF); wprintw(ScrollWin,"LC @ %d LEHV_OFF %4.2f %4.2f\n",__LINE__,FNDC_BATT_VOLTS,
-							MAX(50.8+ MAX(0,((TEMPSENSOR(CENTER_LEFT)-LE_SETPOINT_START)/LE_DIVISOR)),MIN(57,fSellV+0.8)));
+							MAX(50.8+ MAX(0,((TEMPSENSOR(CENTER_LEFT)-LE_SETPOINT_START)/LE_DIVISOR)),MIN(MAX(fSellV,57),fSellV+0.8)));
 				usleep(35000);
 			}
 			digitalWrite(WH_LOWER_ELEMENT,OFF);
 			lcDelay=DEFAULT_DELAY; wprintw(ScrollWin,"LC @ %d LE_OFF %4.2f %4.2f\n",__LINE__,FNDC_BATT_VOLTS,
-							MAX(50.8+ MAX(0,((TEMPSENSOR(CENTER_LEFT)-LE_SETPOINT_START)/LE_DIVISOR)),MIN(57,fSellV+0.8))); 
+							MAX(50.8+ MAX(0,((TEMPSENSOR(CENTER_LEFT)-LE_SETPOINT_START)/LE_DIVISOR)),MIN(MAX(fSellV,57),fSellV+0.8))); 
 			return;
 		}
 	}
