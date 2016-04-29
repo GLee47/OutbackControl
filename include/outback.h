@@ -29,11 +29,11 @@
 //#define DATA_FILE_NAME	"/mnt/sda1/home/glee/c/matedata2014_12_11.csv"
 //#define MATE3_USB "/dev/ttyMate3" 
 #define DEFAULT_SELL_V_MIN 512
-#define DEFAULT_SELL_V_MAX 576
+#define DEFAULT_SELL_V_MAX 588
 //#define GP_MAX	1250
 //#define GP_MIN	0
 #define SUPPORT_MODE_MIN_ADJ_SELL_VOLTS 448
-#define SUPPORT_MODE_MAX_ADJ_SELL_VOLTS 572
+#define SUPPORT_MODE_MAX_ADJ_SELL_VOLTS 588
 #define MIN_SOC_DROPPED	55
 #define MIN_VOLTS_DROPPED 44.8
 #define MAX_NEG_NBA_DROPPED	20
@@ -77,6 +77,8 @@
 #define FNDC_SHUNT_A_AMPS	((((float)/*BufInt(FLEXNETDC_Start+ 7,4)*/ (data[FNDC_INDX][2]))/10.0)*((FNDC_SHUNT_A_NEG==0) ? 1 : (-1)))
 #define FNDC_SHUNT_B_AMPS	((((float)/*BufInt(FLEXNETDC_Start+12,4)*/ (data[FNDC_INDX][3]))/10.0)*((FNDC_SHUNT_B_NEG==0) ? 1 : (-1)))
 #define FNDC_SHUNT_C_AMPS	((((float)/*BufInt(FLEXNETDC_Start+17,4)*/ (data[FNDC_INDX][4]))/10.0)*((FNDC_SHUNT_C_NEG==0) ? 1 : (-1)))
+#define FNDC_EXTRADATAID	((int) (data[FNDC_INDX][5]))
+#define FNDC_EXTRADATA		(data[FNDC_INDX][6])
 #define FNDC_BATT_TEMP		((((float)(data[FNDC_INDX][11])-10.0)*1.8)+32)
 #define CC1_MODE			(data[CC1_INDX][10])	//BufInt(CC1_START+34,2)
 #define CC2_MODE			(data[CC2_INDX][10])	//BufInt(CC2_START+34,2)
@@ -116,16 +118,17 @@
 #define IOM_OFFSET			14
 #define IOM_CHRG			3
 #define INV_IS_OFF			0
-		
+#define GT_NoDrop			((InvInputMode==GridTied) && (DropSelected==0) && (ngp<1000))		
 enum InverterACModes{iacmNoGr=0,iacmDrop=1,iacmUse=2};
-
+enum InvInputModes{	Gen, Support, GridTied, UPS, Backup, MiniGrid }; 
 
 	#ifndef __MateMonitor_c__
 		extern float WHtopMaxTemp,WHtopMinTemp,WHCenterMinTemp,WHmaxAnyTemp;	
-		extern int UnderUtilization, sellv, vacation;
+		extern int UnderUtilization, sellv, vacation, DropSelected, ngp;
 		extern float netbattamps;
 		extern const char * acpsModeDesc[];
 		extern enum AirCondPwrSrcModes AirCondPwrSrc;
+		extern enum InvInputModes InvInputMode;
 	#endif
 
 #endif

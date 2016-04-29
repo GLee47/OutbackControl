@@ -37,7 +37,7 @@ extern void SoundAlarm(int ms);
 
 #define WHMAXTEMP (WHmaxAnyTemp-(100-FNDC_SOC))
 
-#define DEFAULT_DELAY	3
+#define DEFAULT_DELAY	4
 #define WH_TOP_NORMAL_TEMP	120.0
 
 #define DCamps(ACamps)	((float)(((ACamps*L1_INVERTER_VOUT)/FNDC_BATT_VOLTS)-3))
@@ -105,7 +105,7 @@ int setACPS(enum AirCondPwrSrcModes newMode)
 			digitalWrite(MRCOOL2KHP_SRC_GPIO,1);
 			break;
 		case acpsOn:
-			if(((TOT_LOAD(L1)+10)< MAX_LOAD_AMPS) && ((TOT_LOAD(L2)+10)< MAX_LOAD_AMPS))
+			if(((TOT_LOAD(L1)+10)< MAX_LOAD_AMPS) && ((TOT_LOAD(L2)+10)< MAX_LOAD_AMPS) && ((INVERTER_AC_MODE!=0) || (FNDC_BATT_VOLTS>54.0)))
 			{
 				digitalWrite(MRCOOL2KHP_SRC_GPIO,1);
 				digitalWrite(MRCOOL2KHP_PWR_GPIO,1);
@@ -157,7 +157,7 @@ int airCondControl(int targetState)
 void loadShed(void)
 {
 	syncACPS();
-	if((INVERTER_AC_MODE!=iacmDrop) && (INVERTER_AC_MODE!=iacmNoGr))
+	if((INVERTER_AC_MODE!=iacmDrop) && ! GT_NoDrop && (INVERTER_AC_MODE!=iacmNoGr))
 		modeChangeDelay=4; 
 	else 
 		modeChangeDelay--;
@@ -268,10 +268,10 @@ void LoadControl(void)
 		//turn off all elements , set delay and return
 		if((digitalRead(WH_LOWER_ELEMENT)==ON) || (digitalRead(WH_UPPER_ELEMENT)==ON))
 		{
-			digitalWrite(WH_LOWER_ELEMENT,OFF);
+			if (midTankTemp >= WHCenterMinTemp) digitalWrite(WH_LOWER_ELEMENT,OFF);//if min not met keep on heating till popoff blows !!!
 			digitalWrite(WH_UPPER_ELEMENT,OFF);
 			lcDelay=DEFAULT_DELAY; wprintw(ScrollWin,"LC @ %d\n",__LINE__);
-			return;
+			WMVPRINTW(FNDCWin,11,22,"%6d",__LINE__);return;
 		}
 	}
 	if((digitalRead(WH_LOWER_ELEMENT)==OFF) && (midTank == irBelow) && (INVERTER_AC_MODE!=iacmNoGr)
@@ -285,7 +285,7 @@ void LoadControl(void)
 		}
 		TURN_LE_ON;//digitalWrite(WH_LOWER_ELEMENT,ON);
 		lcDelay=DEFAULT_DELAY; wprintw(ScrollWin,"LC @ %d\n",__LINE__);
-		return;
+		WMVPRINTW(FNDCWin,11,22,"%6d",__LINE__);return;
 	}
 	if((digitalRead(WH_UPPER_ELEMENT)==OFF) && (topTank == irBelow) && (INVERTER_AC_MODE!=iacmNoGr) 
 							&& ((TOT_LOAD(L1)+UPPER_L1_DIFF)< MAX_LOAD_AMPS))
@@ -293,7 +293,7 @@ void LoadControl(void)
 		//upper tank temp below range -- turn on upper element, set delay, and return
 		digitalWrite(WH_UPPER_ELEMENT,ON);
 		lcDelay=DEFAULT_DELAY; wprintw(ScrollWin,"LC @ %d\n",__LINE__);
-		return; 
+		WMVPRINTW(FNDCWin,11,22,"%6d",__LINE__);return; 
 	}
 	if ((digitalRead(AIR_COND_GPIO_PIN)==FALSE) && (preferHeatPumpOn==TRUE) && (INVERTER_AC_MODE!=iacmNoGr) 
 				&& ((TOT_LOAD(L1)+AIR_COND_AMPS)< MAX_LOAD_AMPS) && ((TOT_LOAD(L2)+AIR_COND_AMPS)< MAX_LOAD_AMPS))
@@ -301,7 +301,7 @@ void LoadControl(void)
 		if(airCondControl(ON)==TRUE)
 		{ 
 			lcDelay=DEFAULT_DELAY; wprintw(ScrollWin,"LC @ %d\n",__LINE__);		
-			return;	
+			WMVPRINTW(FNDCWin,11,22,"%6d",__LINE__);return;	
 		}
 	}
 	if((INVERTER_AC_MODE==iacmNoGr)) //grid down 
@@ -318,20 +318,20 @@ void LoadControl(void)
 			{
 				digitalWrite(WH_LOWER_ELEMENT,OFF);
 				lcDelay=DEFAULT_DELAY; wprintw(ScrollWin,"LC @ %d\n",__LINE__);
-				return;
+				WMVPRINTW(FNDCWin,11,22,"%6d",__LINE__);return;
 			}
 			if(digitalRead(WH_UPPER_ELEMENT)==ON)
 			{
 				digitalWrite(WH_UPPER_ELEMENT,OFF);
 				lcDelay=DEFAULT_DELAY; wprintw(ScrollWin,"LC @ %d\n",__LINE__);
-				return;
+				WMVPRINTW(FNDCWin,11,22,"%6d",__LINE__);return;
 			}
 			if (digitalRead(AIR_COND_GPIO_PIN))
 			{
 				if(airCondControl(ACC_OFF_NOW)==TRUE)
 				{
 					lcDelay=DEFAULT_DELAY; wprintw(ScrollWin,"LC @ %d\n",__LINE__);		
-					return;	
+					WMVPRINTW(FNDCWin,11,22,"%6d",__LINE__);return;	
 				}
 			}
 		}
@@ -343,25 +343,25 @@ void LoadControl(void)
 				if(airCondControl(ON)==TRUE)
 				{ 
 					lcDelay=DEFAULT_DELAY; wprintw(ScrollWin,"LC @ %d\n",__LINE__);		
-					return;	
+					WMVPRINTW(FNDCWin,11,22,"%6d",__LINE__);return;	
 				}
 			}
 			if(digitalRead(WH_UPPER_ELEMENT)!=ON)	//favoring upper element to get some hot quick	
 			{
 				digitalWrite(WH_UPPER_ELEMENT,ON);
 				lcDelay=DEFAULT_DELAY; wprintw(ScrollWin,"LC @ %d\n",__LINE__);
-				return;
+				WMVPRINTW(FNDCWin,11,22,"%6d",__LINE__);return;
 			}
 			if(digitalRead(WH_LOWER_ELEMENT)!=ON)
 			{
 				TURN_LE_ON;//digitalWrite(WH_LOWER_ELEMENT,ON);
 				lcDelay=DEFAULT_DELAY; wprintw(ScrollWin,"LC @ %d\n",__LINE__);
-				return;
+				WMVPRINTW(FNDCWin,11,22,"%6d",__LINE__);return;
 			}			
 		}
-		return;
+		WMVPRINTW(FNDCWin,11,22,"%6d",__LINE__);return;
 	}
-	else if(INVERTER_AC_MODE==iacmUse)  //using grid -- minimize use
+	else if((INVERTER_AC_MODE==iacmUse) && (! GT_NoDrop)) //using grid -- minimize use unless grid tied and no drop selected
 	{
 		lastIACMode=iacmUse;
 		if((vacation==TRUE)&&(AirCondPwrSrc!=acpsNone))
@@ -373,7 +373,7 @@ void LoadControl(void)
 			if(airCondControl(ACC_OFF_NOW)==TRUE)
 			{
 				lcDelay=DEFAULT_DELAY; wprintw(ScrollWin,"LC @ %d\n",__LINE__);		
-				return;	
+				WMVPRINTW(FNDCWin,11,22,"%6d",__LINE__);return;	
 			}
 		}
 		if(topTank != irBelow)
@@ -409,16 +409,16 @@ void LoadControl(void)
 			}
 		}
 		if(vacation==TRUE)setACPS(acpsNone);
-		return;
+		WMVPRINTW(FNDCWin,11,22,"%6d",__LINE__);return;
 	}
 	
 	//we haven't returned yet we must be in dropped grid mode -- try to manage charge volts
-	//(INVERTER_AC_MODE==iacmDrop)
+	//((INVERTER_AC_MODE==iacmDrop) || GT_NoDrop)
 	
 	lastIACMode=INVERTER_AC_MODE;
 	if(modeChangeDelay>0)
 	{ /*wprintw(ScrollWin,"LC @ %d\n",__LINE__);*/
-		return;
+		WMVPRINTW(FNDCWin,11,22,"%6d",__LINE__);return;
 	}
 	
 	if((UnderUtilization)||((vacation==FALSE)&&(netbattamps > DCamps(LOWER_LV_L2_DIFF)))
@@ -437,7 +437,7 @@ void LoadControl(void)
 			if(airCondControl(ON)==TRUE)
 			{ 
 				lcDelay=DEFAULT_DELAY; wprintw(ScrollWin,"LC @ %d AC on (prefered)\n",__LINE__);		
-				return;	
+				WMVPRINTW(FNDCWin,11,22,"%6d",__LINE__);return;	
 			}
 		}
 		if ((AirCondPwrSrc==acpsGrid) && ((TOT_LOAD(L1)+10)< MAX_LOAD_AMPS) && ((TOT_LOAD(L2)+10)< MAX_LOAD_AMPS))
@@ -452,7 +452,7 @@ void LoadControl(void)
 			//upper tank temp in range -- turn on upper element, set delay, and return
 			digitalWrite(WH_UPPER_ELEMENT,ON);
 			lcDelay=DEFAULT_DELAY; wprintw(ScrollWin,"LC @ %d UE_ON %4.2f %4.2f\n",__LINE__,FNDC_BATT_VOLTS,MAX(50.7,fSellV+0.6));
-			return;
+			WMVPRINTW(FNDCWin,11,22,"%6d",__LINE__);return;
 		}
 		//top >120 or we got more juce them bring up bottom temp
 		if((digitalRead(WH_LOWER_ELEMENT)==OFF) && (midTank != irAbove) && 
@@ -469,7 +469,7 @@ void LoadControl(void)
 				TURN_LE_ON;//digitalWrite(WH_LOWER_ELEMENT,ON);
 				lcDelay=DEFAULT_DELAY; wprintw(ScrollWin,"LC @ %d LE_ON %4.2f %4.2f\n",__LINE__,FNDC_BATT_VOLTS,
 							MAX(50.8+ MAX(0,((TEMPSENSOR(CENTER_LEFT)-LE_SETPOINT_START)/LE_DIVISOR)),MIN(MAX(fSellV,57),fSellV+0.8)));
-				return;
+				WMVPRINTW(FNDCWin,11,22,"%6d",__LINE__);return;
 			}
 		}
 		//still more juce, turn on both elements
@@ -481,7 +481,7 @@ void LoadControl(void)
 			digitalWrite(WH_UPPER_ELEMENT,ON);
 			lcDelay=DEFAULT_DELAY; wprintw(ScrollWin,"LC @ %d UE_ON %4.2f %4.2f\n",__LINE__,FNDC_BATT_VOLTS,
 							MAX(51.2 + MAX(0,((TEMPSENSOR(TOP)-UE_SETPOINT_START)/UE_DIVISOR)),fSellV+1.2));
-			return;
+			WMVPRINTW(FNDCWin,11,22,"%6d",__LINE__);return;
 		}
 		if ((digitalRead(AIR_COND_GPIO_PIN)==FALSE) && (preferHeatPumpOn==FALSE)
 				&& ((TOT_LOAD(L1)+AIR_COND_AMPS)< MAX_LOAD_AMPS) && ((TOT_LOAD(L2)+AIR_COND_AMPS)< MAX_LOAD_AMPS)
@@ -491,7 +491,7 @@ void LoadControl(void)
 			{ 
 				lcDelay=DEFAULT_DELAY; wprintw(ScrollWin,"LC @ %d AC_ON L1:%2dA L2:%2dA vgoal %3.1f\n",__LINE__,TOT_LOAD(L1),TOT_LOAD(L2),
 								MIN(MAX(5.2 + MAX(1,((TEMPSENSOR(TOP)-130)/20)),fSellV+2.4),56.8));		
-				return;	
+				WMVPRINTW(FNDCWin,11,22,"%6d",__LINE__);return;	
 			}
 		}
 	}
@@ -505,7 +505,7 @@ void LoadControl(void)
 			{
 				lcDelay=DEFAULT_DELAY; wprintw(ScrollWin,"LC @ %d AC_OFF %3.1f %4.2f\n",__LINE__,FNDC_BATT_VOLTS,
 												MAX(51.2, MIN(57,(fSellV+2.0))));		
-				return;	
+				WMVPRINTW(FNDCWin,11,22,"%6d",__LINE__);return;	
 			}
 		}
 	}
@@ -519,7 +519,7 @@ void LoadControl(void)
 			digitalWrite(WH_UPPER_ELEMENT,OFF);
 			lcDelay=DEFAULT_DELAY; wprintw(ScrollWin,"LC @ %d UE_OFF %4.2f %4.2f\n",__LINE__,FNDC_BATT_VOLTS,
 						MAX(51.2 + MAX(0,((TEMPSENSOR(TOP)-UE_SETPOINT_START)/UE_DIVISOR)),MIN(57,fSellV+1.2)));
-			return;
+			WMVPRINTW(FNDCWin,11,22,"%6d",__LINE__);return;
 		}
 	}
 	if((!UnderUtilization) /*&& (netbattamps < 0)*/ && 
@@ -538,7 +538,7 @@ void LoadControl(void)
 			digitalWrite(WH_LOWER_ELEMENT,OFF);
 			lcDelay=DEFAULT_DELAY; wprintw(ScrollWin,"LC @ %d LE_OFF %4.2f %4.2f\n",__LINE__,FNDC_BATT_VOLTS,
 							MAX(50.8+ MAX(0,((TEMPSENSOR(CENTER_LEFT)-LE_SETPOINT_START)/LE_DIVISOR)),MIN(MAX(fSellV,57),fSellV+0.8))); 
-			return;
+			WMVPRINTW(FNDCWin,11,22,"%6d",__LINE__);return;
 		}
 	}
 	if((!UnderUtilization) && (FNDC_BATT_VOLTS < fSellV) && (preferHeatPumpOn==TRUE)) 
@@ -548,9 +548,10 @@ void LoadControl(void)
 			if(airCondControl(OFF)==TRUE)
 			{
 				lcDelay=DEFAULT_DELAY; wprintw(ScrollWin,"LC @ %d AC_OFF %4.2f %4.2f\n",__LINE__,FNDC_BATT_VOLTS,fSellV);		
-				return;	
+				WMVPRINTW(FNDCWin,11,22,"%6d",__LINE__);return;	
 			}
 		}
 	}
 	if((vacation==TRUE)&&(FNDC_BATT_VOLTS<(VACATION_VSET-1.6)))setACPS(acpsNone);
+	WMVPRINTW(FNDCWin,11,22,"%6d",__LINE__);return;
 }
