@@ -2,9 +2,14 @@
 #ifndef __outback_h__
 	#define __outback_h__
 
+
+#define MAX(ARG1,ARG2)		(((ARG1)>(ARG2)) ? (ARG1) : (ARG2))
+#define MIN(ARG1,ARG2)		(((ARG1)<(ARG2)) ? (ARG1) : (ARG2))
+#define BETWEEN(ARG,LOW,HI)	((ARG>=LOW) && (ARG<=HI))
+//#define INT_ROUND(NUMBR,RESOLUTION)	NUMBR=(((int)((NUMBR+(RESOLUTION/2))/(float)RESOLUTION))*RESOLUTION)
 #define CHECK_BIT(var,pos) ((var) & (1<<(pos)))
 #define	NumPacketsLoop	60
-#define UTIL_RATE	0.126
+#define UTIL_RATE	0.1168
 #define INVERTER_V			((float)(metric[1][20]/10.0))
 #define MISC_BIT			((char)(metric[1][21]))
 #define INV_AUX_OUT			CHECK_BIT(MISC_BIT,4)
@@ -33,31 +38,44 @@
 //#define GP_MAX	1250
 //#define GP_MIN	0
 #define SUPPORT_MODE_MIN_ADJ_SELL_VOLTS 448
-#define SUPPORT_MODE_MAX_ADJ_SELL_VOLTS 588
-#define MIN_SOC_DROPPED	55
+#define SUPPORT_MODE_MAX_ADJ_SELL_VOLTS 596
+#define MIN_SOC_DROPPED	80
 #define MIN_VOLTS_DROPPED 44.8
 #define MAX_NEG_NBA_DROPPED	20
 //pins
 #define PIN_ALARM				25
 #define WH_LOWER_ELEMENT		26  /* BCM pin# */ 
-#define WH_LOWER_ELEMENT_HV		12  /* BCM pin# */ 
+#define WH_LOWER_ELEMENT_HV		19  /* BCM pin# */ //made up number-- no such thing now
+#define COMPRESSOR_CTRL_PIN		12	/* BCM pin# */
 #define WH_LOWER_ELEMENT_SRC	27	/* BCM pin# */
 #define WH_UPPER_ELEMENT		16  /* BCM pin# */ 
 #define AIR_COND_GPIO_PIN		5	/* frount window unit on/off */
+#define AIR_JORDAN_SRC_PIN		6	//	BCM High is inverter / low is grid
 #define MRCOOL2KHP_PWR_GPIO		22	/*Mr Cool great room pwr high on/low off (src must be inverter to turn off i.e. pin 22 high) */
 #define	MRCOOL2KHP_SRC_GPIO		17	/*Mr Cool great room power sorce - high is inverter, low is grid */
-#define MrCoolOffTemp			69.3
-#define MR_COOL_ON_TEMP_DEFAULT	69.9	
-#define MrHeatOffTemp			71.5
-#define MR_HEAT_ON_TEMP_DEFAULT	70.7	
+#define MR_COOL_OFF_TEMP_DEFAULT	69.3
+#define MR_COOL_ON_TEMP_DEFAULT		69.9	
+//#define UEON	digitalWrite(WH_UPPER_ELEMENT,ON)
+//#define UEOFF	digitalWrite(WH_UPPER_ELEMENT,OFF)
+#define UEON		(UE_PWM.percent=100)
+#define UEOFF		(UE_PWM.percent=0)
+#define UE_DOWN		{UE_PWM.percent-=(100/MIN(MAX(1,UE_PWM.resolution),5));if(UE_PWM.percent<0)UE_PWM.percent=0;}
+#define UE_UP		{UE_PWM.percent+=(100/MIN(MAX(1,UE_PWM.resolution),5));if(UE_PWM.percent>100)UE_PWM.percent=100;}
+#define LE_IS_ON 	(LE_PWM.percent>0)	/*(digitalRead(WH_LOWER_ELEMENT)==ON)*/
+#define LE_IS_ON_FULL 	(LE_PWM.percent>=100)
+#define LE_IS_OFF 	(LE_PWM.percent<=0)
+#define LEON		(LE_PWM.percent=100)
+#define LEOFF		(LE_PWM.percent=0)
+#define LE_DOWN		{LE_PWM.percent-=(100/MIN(MAX(1,LE_PWM.resolution),5));if(LE_PWM.percent<0)LE_PWM.percent=0;}
+#define LE_UP		{LE_PWM.percent+=(100/MIN(MAX(1,LE_PWM.resolution),5));if(LE_PWM.percent>100)LE_PWM.percent=100;}
+
+//#define MrHeatOffTemp			71.5
+//#define MR_HEAT_ON_TEMP_DEFAULT	70.7	
 
 //#define WATERHEATEROFF	digitalRead(WH_LOWER_ELEMENT)
 //#define WATERHEATERON	if (INVERTER_AUX_OUT==0){cmdMate("AUXON","1");}
 #define WaterHeaterKWH ((((float)IAO_Day_Secs)/3600.0)*1.08)+(((((float)IAR_Day_Secs)/3600.0))*4.32)
-#define MAX(ARG1,ARG2)		(((ARG1)>(ARG2)) ? (ARG1) : (ARG2))
-#define MIN(ARG1,ARG2)		(((ARG1)<(ARG2)) ? (ARG1) : (ARG2))
-#define BETWEEN(ARG,LOW,HI)	((ARG>=LOW) && (ARG<=HI))
-//#define INT_ROUND(NUMBR,RESOLUTION)	NUMBR=(((int)((NUMBR+(RESOLUTION/2))/(float)RESOLUTION))*RESOLUTION)
+
 #define INVERTER_START	14
 #define CC1_START		90
 #define CC2_START		138
@@ -110,7 +128,9 @@
 #define INVERTER_AUX_OUT	CHECK_BIT(INV_MISC_BIT,4)
 #define INVERTER_AUX_RELAY	CHECK_BIT(INV_MISC_BIT,5)
 #define INVPWR				((L1_INVERTER_AMPS)*(L1_INVERTER_VOUT)+(L2_INVERTER_AMPS)*(L2_INVERTER_VOUT))
+#define	TOTAL_INV_AC_CHRG_AMPS	(L1_CHARGER_AMPS+L2_CHARGER_AMPS)
 #define WH_HALF_DC_AMPS		13
+#define WH_ELEMENT_OHMS		12
 #define INVEFF				0.92
 #define PUMPMAXAMPS			9
 #define BATT_STATUS_AH_RAW	(((BatAmpHrIn)-BatAmpHrOut)-BatAmpHrCrx)
@@ -118,17 +138,27 @@
 #define IOM_OFFSET			14
 #define IOM_CHRG			3
 #define INV_IS_OFF			0
-#define GT_NoDrop			((InvInputMode==GridTied) && (DropSelected==0) && (ngp<1000))		
+#define GT_NoDrop			((InvInputMode==GridTied) && (DropSelected==0) /*&& (ngp<1500)*/)		
+#define ANGP	(angp.avg)
+#define	AFNDCV	(aFNDCvolts.avg)
+#define ANBA	(aNBA.avg)
+
 enum InverterACModes{iacmNoGr=0,iacmDrop=1,iacmUse=2};
 enum InvInputModes{	Gen, Support, GridTied, UPS, Backup, MiniGrid }; 
 
 	#ifndef __MateMonitor_c__
 		extern float WHtopMaxTemp,WHtopMinTemp,WHCenterMinTemp,WHmaxAnyTemp;	
-		extern int UnderUtilization, sellv, vacation, DropSelected, ngp;
+		extern int UnderUtilization, sellv, vacation, DropSelected, ngp, airJordanManOff;
 		extern float netbattamps;
 		extern const char * acpsModeDesc[];
-		extern enum AirCondPwrSrcModes AirCondPwrSrc;
+//		extern enum AirCondPwrSrcModes AirCondPwrSrc;
 		extern enum InvInputModes InvInputMode;
+		extern volatile struct pwm{int resolution; int count; int percent;}UE_PWM, LE_PWM;
+		extern int loadBalance;//0=OK, 1=high (need to reduce), -1=low (need to increase)
+		extern struct angpAverager{int tot;int avg;int indx;int history[10];}angp;
+//		extern int updateANGP(void);
+		extern struct fndcVoltsAverager{float tot;float avg;int indx;float history[5];}aFNDCvolts;
+		struct fndcNetBattAmpAverager{float tot;float avg;int indx;float history[15];}aNBA;
 	#endif
 
 #endif
@@ -136,6 +166,18 @@ enum InvInputModes{	Gen, Support, GridTied, UPS, Backup, MiniGrid };
 #ifndef YES
 #define YES	1
 #define	NO	0
+#endif
+
+#ifndef ON
+	#define ON	1
+#endif
+
+#ifndef OFF
+	#define OFF	0
+#endif
+
+#ifndef ASK
+	#define ASK 0xFFFF
 #endif
 
 #ifndef __usb_com_h__

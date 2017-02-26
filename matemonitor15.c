@@ -62,7 +62,7 @@ int SMS_doSendStatRpt=NO;
 					,hour, FNDC_BATT_VOLTS, FNDC_SOC,WaterHeaterKWH,BuyWH/1000.0,InvWH/1000.0\
 					,CC1_KWHH,CC2_KWHH,CC1_KWHH+CC2_KWHH, (DroppedSecs/60),(PowerOutageSecs/60)\
 					,(UnderUtilizationSecs/60), SOCstart, FNDC_SOC);\
-					wprintw(ScrollWin,"%d Send returned %d - %s\n",__LINE__,SMS_SendMsg("2814509680",strtmp),strtmp);}
+					logMesg("%d Send returned %d - %s\n",__LINE__,SMS_SendMsg("2814509680",strtmp),strtmp);}
 
 enum CC_Modes{ Silent=0, Float=1, Bulk=2, Absorb=3, Equlize=4 };
 enum InvInputModes /*{	Gen, Support, GridTied, UPS, Backup, MiniGrid }*/ InvInputMode=Support;
@@ -87,6 +87,7 @@ char  strtmp[256];
 WINDOW * InvWin,* CCWin,* FNDCWin,* ScrollWin;
 int ch;
 volatile bool terminate=false;
+
 bool initilized=NO, EnableSystem=NO, DischargeAllowed=YES, AllowDaytimeInvCharge=FALSE,BathDone=FALSE,wh_le_src=INVERTER,
 				preferHeatPumpOn=FALSE,InvChrgEnabled=NO, MateCommResponseExpected=NO, InvIgnLowVolt=false;
 int CurrentDay, DroppedSecs=0, PowerOutageSecs=0, UnderUtilizationSecs=0;
@@ -102,6 +103,7 @@ float	MC_On_Temp=MR_COOL_ON_TEMP_DEFAULT,MC_Off_Temp=MR_COOL_OFF_TEMP_DEFAULT;
 #define MrCoolMode	((MC_On_Temp>MC_Off_Temp)?1:0)
 int vacation=FALSE,ngp, invMode, selling, buying, sellv=0, invbattv=0, KBLock=0, DropSelected=0, AmpsBelowThresholdWaitSecs=5;
 int InverterPwr=0, SellVoltMin=DEFAULT_SELL_V_MIN, SellVoltMax=DEFAULT_SELL_V_MAX, UnderUtilization;
+int loadBalance=0;//0=OK, 1=high (need to reduce), -1=low (need to increase)
 time_t epoch_time,ResetTime;
 struct tm *tm_p, ResetTime_p;
 int dow=0,hour=0,minute=0,second=0;
@@ -111,10 +113,57 @@ enum WHCMD{ cNone,cOff,cOn,cCheck,cInq, cSet, cUnset };
 enum WHFlags{ fNone, fSetOverLoad, fSetManLck, fRelManLck, fManual, fAuto, fOverLoad, fManLck, fAllowTimer, fTimer};
 sqlite3 *ppDb, *MMDb;
 int airJordanManOff=FALSE;
-float CwattHoursGen=0, CwattHoursPump=0;
-FILE *mmlog;
+float CwattHoursGen=0.0, CwattHoursPump=0.0;
+FILE *mmlog, *persistantData;
 
 #define TimeTest(HOUR,MIN,SEC)	(((HOUR==hour)||(HOUR<0)) && ((MIN==minute)||(MIN<0)) && ((SEC==second)||(SEC<0)))
+
+struct fndcNetBattAmpAverager{
+	float tot;
+	float avg;
+	int indx;
+	float history[15];
+}aNBA;
+
+float updateANBA(void){
+	aNBA.tot=aNBA.tot-aNBA.history[aNBA.indx]+netbattamps;
+	aNBA.history[aNBA.indx++]=netbattamps;
+	if(aNBA.indx>=15)aNBA.indx=0;
+	return (aNBA.avg=(aNBA.tot/15));
+}
+
+struct fndcVoltsAverager{
+	float tot;
+	float avg;
+	int indx;
+	float history[5];
+}aFNDCvolts;
+
+float updateAFNDCvolts(void){
+	float Volts=FNDC_BATT_VOLTS;
+	aFNDCvolts.tot=aFNDCvolts.tot-aFNDCvolts.history[aFNDCvolts.indx]+Volts;
+	aFNDCvolts.history[aFNDCvolts.indx++]=Volts;
+	if(aFNDCvolts.indx>=5)aFNDCvolts.indx=0;
+	return (aFNDCvolts.avg=(aFNDCvolts.tot/5));
+}
+
+struct angpAverager{
+	int tot;
+	int avg;
+	int indx;
+	int history[10];
+}angp;
+
+int updateANGP(void){
+	angp.tot=angp.tot-angp.history[angp.indx]+ngp;
+	angp.history[angp.indx++]=ngp;
+	if(angp.indx>=10)angp.indx=0;
+	return (angp.avg=(angp.tot/10));
+}
+
+/*int getANGP(void){
+	return angp.tot/5;
+}*/
 
 struct {
 	int	Indx;
@@ -130,7 +179,9 @@ struct {
 	char Description[64];
 }PrgDataStruct;
 
-volatile struct pwm{int Len; int Off; int c;}UE_PWM;
+volatile struct pwm{int resolution; int count; int percent;}UE_PWM, LE_PWM;
+//volatile float	WaterHeaterKWH=0.0;
+volatile long	PWM_Debug_count;
 
 void timer_handler(int signum)
 {
@@ -150,17 +201,27 @@ void logMesg(const char *fmt,...){
 	va_list ap;
 	
 	va_start(ap,fmt);
+	wprintw(ScrollWin,"%.2d:%.2d:%.2d:%.2d ",dow,hour,minute,second);
 	vwprintw(ScrollWin,fmt,ap);
-	vfprintf(mmlog,fmt,ap);
+	mmlog=fopen("/var/log/mm.log","a");
+	if(mmlog==NULL){
+		perror("Unable to open /var/log/mm.log");
+//		exit(1);
+	}else{
+		fprintf(mmlog,"%.1d:%.2d:%.2d:%.2d ",dow,hour,minute,second);
+		vfprintf(mmlog,fmt,ap);
+		fclose(mmlog);
+	}
 	va_end(ap);
+//	fflush(mmlog);
 }
 
 void cmdMate(char * cmd, char * v, int ibookmark){
 static int iLastBookmark=0;
 	if ((write (usbmate,"<",1))<0)
 	{
-		wprintw(ScrollWin,"Error writing to usb\n");
-		fprintf(mmlog,"%.2d:%.2d:%.2d:%.2d Error writing to usb\n",dow,hour,minute,second);
+//		wprintw(ScrollWin,"Error writing to usb\n");
+		logMesg("%.2d:%.2d:%.2d:%.2d Error writing to usb\n",dow,hour,minute,second);
 	}
 	write (usbmate,cmd,strlen(cmd));
 	write (usbmate,":",1);
@@ -186,11 +247,16 @@ int lDiff=(NewLimit-AC1InLimit);
 
 void shunt_C_monitor(void){
 	static time_t Cstart=0;//,Cend=0;
+//	static time_t periodStart=0;
+//	static long pWM=0;
 	float Camps=(FNDC_SHUNT_C_AMPS), CwattHours=0.0;
 	
 	if (((Camps > 10.0) || (Camps < (-1.0))) && (Cstart>0))
 	{
 		CwattHours = (Camps * FNDC_BATT_VOLTS * (float)((difftime(epoch_time,Cstart))/3600.0));
+/*		if(periodStart==0){
+			periodStart=epoch_time;
+		}*/
 		if(FNDC_SHUNT_C_NEG)
 		{
 			CwattHoursPump -= CwattHours;
@@ -207,13 +273,20 @@ void init(){
 sqlite3_stmt *stmt;
 char sql[4096];
 	initilized=YES;
+	angp.tot=ngp*5;
+	angp.avg=ngp;
+	angp.indx=0;
+	aFNDCvolts.tot=FNDC_BATT_VOLTS*5;
+	aFNDCvolts.avg=FNDC_BATT_VOLTS;
+	aFNDCvolts.indx=0;
+	{int i; for(i=0;i<5;i++){angp.history[i]=ngp;aFNDCvolts.history[i]=FNDC_BATT_VOLTS;}}
 	cmdMate("SELLV","512",__LINE__);
 	sellv=512;
 	cmdMate("AC1INLM","45",__LINE__);	
 //	BatAmpHrCrx=(100.0-(float)(FNDC_SOC))*(BatRatedAmpHr/100.0);
 	strcpy(sql,"select WHKWH,BuyKWH,InvertedKWH,DroppedMin,PowerOutageMin,UnderUtilizationMin"
 		",BattAHin,BattAHout,BatAmpHrCrx,debug3 from stats WHERE TimeStamp=(SELECT MAX(TimeStamp) FROM stats)");
-	wprintw(ScrollWin,"At init()%d\n",0);
+	logMesg("At init()%d\n",0);
 	if (sqlite3_prepare_v2(MMDb, sql, strlen(sql)+1, &stmt, NULL)==SQLITE_OK){
 		if (sqlite3_step (stmt)==SQLITE_ROW){
 			IAO_Day_Secs=(long)((sqlite3_column_double(stmt,0)*3600.0)/1.08);
@@ -243,6 +316,13 @@ char sql[4096];
 		WHCenterMinTemp=115;
 		WHtopMinTemp=130;
 	}
+	persistantData=fopen("persistant.ini","r");
+	if(persistantData==NULL){
+		perror("Unable to open persistant.ini");
+		exit(1);
+	}
+	fscanf(persistantData,"%f %f", &CwattHoursPump, &CwattHoursGen);
+	fclose(persistantData);
 }	
 
 void WHpowerLevel(int OnHigh){
@@ -275,7 +355,7 @@ char sql[4096];
 				PrgDataStruct.SOC_Targ=sqlite3_column_int(stmt,2);
 				PrgDataStruct.SellV=sqlite3_column_int(stmt,3);
 				PrgDataStruct.factor=sqlite3_column_int(stmt,4);
-				wprintw(ScrollWin,"Description %s\n",sqlite3_column_text(stmt,5));
+				logMesg("Description %s\n",sqlite3_column_text(stmt,5));
 				strncpy(PrgDataStruct.Description,(char *)sqlite3_column_text(stmt,5),63);
 				sqlite3_finalize(stmt);
 			}//else terminate=true;
@@ -336,7 +416,7 @@ int sendmail(const char *to, const char *from, const char *subject, const char *
 }
 
 void ProcessSMSmesg(struct SMS_Message_Properties *mesg){
-	wprintw(ScrollWin,"Recieved -%s- from %s %d %d\n",mesg->MsgText,mesg->PhoneNum,hour,minute);
+	logMesg("Recieved -%s- from %s %d %d\n",mesg->MsgText,mesg->PhoneNum,hour,minute);
 	if(strcmp("2814509680",mesg->PhoneNum)!=0) return;
 	switch (mesg->MsgText[0]) {
 		case 'P'	:
@@ -358,10 +438,10 @@ void ProcessSMSmesg(struct SMS_Message_Properties *mesg){
 			break;			
 		case 'C':
 		case 'c':
-			wprintw(ScrollWin,"found c @ %d %s\n",__LINE__,mesg);
+			logMesg("found c @ %d %s\n",__LINE__,mesg);
 			if (mesg->MsgText[1]=='0')
 			{
-				wprintw(ScrollWin,"%d found c @ %d %s\n",InvChrgEnabled,__LINE__,mesg);
+				logMesg("%d found c @ %d %s\n",InvChrgEnabled,__LINE__,mesg);
 				if (InvChrgEnabled==YES){
 //					cmdMate("BULK","2");
 					cmdMate("CHG","0",__LINE__);
@@ -428,17 +508,21 @@ static float AvHrVolts=0.0;
 static long c=0L, AvHrSOC=0L;
 
 	++c; AvHrVolts+=FNDC_BATT_VOLTS; AvHrSOC+=(long)FNDC_SOC;
-  if ((TimeTest(-1,1,1))&&(PrgDataStruct.SOC_Targ<100)&&(InvChrgEnabled==YES))
-  {				
+	if (TimeTest(-1,32,0)){
+		logMesg("PWM debug count=%d\n", PWM_Debug_count);
+		PWM_Debug_count=0;
+	}
+	if ((TimeTest(-1,1,1))&&(PrgDataStruct.SOC_Targ<100)&&(InvChrgEnabled==YES))
+	{				
 		cmdMate("CHG","0",__LINE__);
 		InvChrgEnabled=NO;
-		wprintw(ScrollWin,"Turning charger off at %d:%d\n",hour,minute);
-  }
-  if((tm_p->tm_mday==2) && (hour>=10)) vacation=FALSE;
-  if(vacation==FALSE)
-  {
-	switch (hour)
+		logMesg("Turning charger off at %d:%d\n",hour,minute);
+	}
+	if((tm_p->tm_mday==32) && (hour>=10)) vacation=FALSE;
+	if(vacation==FALSE)
 	{
+		switch (hour)
+		{
 		case 5	:
 			if (TimeTest(5,30,0))	AmpsBelowThresholdWaitSecs=25;
 			if (TimeTest(5,45,0))	if(WHtopMinTemp<115.0) WHtopMinTemp=115.0;
@@ -553,7 +637,7 @@ static long c=0L, AvHrSOC=0L;
 				{
 					wh_le_src=GRID;
 					WhLEGridGoal=125.0;
-					wprintw(ScrollWin,"Lower WH element on grid\n");
+					logMesg("Lower WH element on grid\n");
 				}
 			}
 			break;
@@ -572,7 +656,7 @@ static long c=0L, AvHrSOC=0L;
 			{
 				wh_le_src=INVERTER;
 				WhLEGridGoal=50.0;
-				wprintw(ScrollWin,"Lower WH element on inverter\n");
+				logMesg("Lower WH element on inverter\n");
 			}
 			if (TimeTest(17,0,0) && (InvInputMode==GridTied))
 			{
@@ -658,7 +742,7 @@ static long c=0L, AvHrSOC=0L;
   }
 //Every hour on the hour
 	if (TimeTest(-1,0,0)){ 
-		SaveStats((AvHrVolts/c),(int)(AvHrSOC/c));whsSetFlags(whsTimer, whsOff);
+		SaveStats((AvHrVolts/c),(int)(AvHrSOC/c));//whsSetFlags(whsTimer, whsOff);
 		c=0; AvHrSOC=0; AvHrVolts=0.0;
 	}
 //11:59:59PM
@@ -726,11 +810,11 @@ void PowerOutage(void)
 		ALARM_TIMMER(td,900ul,5,10)
 		{			
 			sprintf(strtmp,"Power is off! Volts= %3.1f SOC= %3d Net Batt Amps= %6.1f"
-					, FNDC_BATT_VOLTS, FNDC_SOC,netbattamps);
-			wprintw(ScrollWin,"SMS_SendMsg returned %d. Msg: %s\n",SMS_SendMsg("2814509680",strtmp),strtmp);
+					, FNDC_BATT_VOLTS, FNDC_SOC,ANBA);
+			logMesg("SMS_SendMsg returned %d. Msg: %s\n",SMS_SendMsg("2814509680",strtmp),strtmp);
 			SoundAlarm(200);
 			//usleep(100000);
-			wprintw(ScrollWin,"SMS_SendMsg returned %d. Msg: %s\n",SMS_SendMsg("4096730837",strtmp),strtmp);
+			logMesg("SMS_SendMsg returned %d. Msg: %s\n",SMS_SendMsg("4096730837",strtmp),strtmp);
 			if (FNDC_BATT_VOLTS<52.0) setACPS(acpsGrid);//4-27-2016
 			else if (FNDC_BATT_VOLTS>56.0) setACPS(acpsInverter);
 		}
@@ -773,14 +857,14 @@ float SOC_VarToTrg(void){
 /*int NSV=NEWSELLV;\
 									if ((NSV<MaxVNegAmps)&&(DischargeAllowed==NO))NSV=MaxVNegAmps;\*/
 void ControlSupportMode(void){//need to fix offset mode -- drop grid if input exceedes output by the target
-static int pause=0;
-enum CC_Modes CC_Mode1=CC1_MODE,CC_Mode2=CC2_MODE;
-float SOCVTT=SOC_VarToTrg();
-int BuyCurMax=MAX(L1_BUY_AMPS,L2_BUY_AMPS);
-int SelCurMax=MAX(L1_SELL_AMPS,L2_SELL_AMPS);
-static int Selling=0;
-int AdjustedSellV=(int)((SOCVTT * (float)PrgDataStruct.factor) + (float)PrgDataStruct.SellV);
-static int pau=0;//pause for adjusting sell voltage
+	static int pause=0;
+	enum CC_Modes CC_Mode1=CC1_MODE,CC_Mode2=CC2_MODE;
+	float SOCVTT=SOC_VarToTrg();
+	int BuyCurMax=MAX(L1_BUY_AMPS,L2_BUY_AMPS);
+	int SelCurMax=MAX(L1_SELL_AMPS,L2_SELL_AMPS);
+	static int Selling=0;
+	int AdjustedSellV=(int)((SOCVTT * (float)PrgDataStruct.factor) + (float)PrgDataStruct.SellV);
+	static int pau=0;//pause for adjusting sell voltage
 	if (INVERTER_OP_MODE==IOM_CHRG){
 		if (sellv!=620){
 			cmdMate("SELLV","620",__LINE__);
@@ -817,7 +901,7 @@ static int pau=0;//pause for adjusting sell voltage
 	if (AdjustedSellV>SUPPORT_MODE_MAX_ADJ_SELL_VOLTS) AdjustedSellV=MAX(SUPPORT_MODE_MAX_ADJ_SELL_VOLTS,((float)PrgDataStruct.SellV));
 	if ((AdjustedSellV<(int)(MaxVNegAmps*10.0))&&(DischargeAllowed!=YES)) AdjustedSellV=(int)(MaxVNegAmps*10.0);
 	if (InvInputMode != GridTied) WMVPRINTW(FNDCWin,6,2,"%s                       ","");
-	if (ngp<0){Selling++;}else{Selling=0;}
+	if (ANGP<0){Selling++;}else{Selling=0;}
 	if (FNDC_BATT_VOLTS<45){
 		cmdMate("AC1INLM","48",__LINE__);
 //		whsSetFlags(whsConserve,whsOn);
@@ -934,7 +1018,7 @@ static int pau=0;//pause for adjusting sell voltage
 			return;
 		}
 	int InvV=L1_INVERTER_VOUT+L2_INVERTER_VOUT;	
-	int LoadDifWats=(BatTrgAmp-netbattamps)*INVERTERVOLTS;
+	int LoadDifWats=(BatTrgAmp-ANBA)*INVERTERVOLTS;
 		if (abs(LoadDifWats)>300) 
 		{
 		int ACLoadDifAmps=LoadDifWats/InvV;
@@ -954,7 +1038,7 @@ static int pau=0;//pause for adjusting sell voltage
 //					whsSetFlags(whsAuto,whsOff);	
 					pause=3;
 				}
-				if ((INVERTERVOLTS < sellv) || (netbattamps > BatTrgAmp) || (NewLimit > AC1InLimit)){
+				if ((INVERTERVOLTS < sellv) || (ANBA > BatTrgAmp) || (NewLimit > AC1InLimit)){
 					if ((NewLimit>=AC1InLimit) || (BuyCurMax>=NewLimit)){
 						sprintf(strtmp,"%d",MAX(NewLimit,5));
 						cmdMate("AC1INLM",strtmp,__LINE__);
@@ -970,11 +1054,26 @@ static int pau=0;//pause for adjusting sell voltage
 void ControlGridTieUse(void){
 int SOD=(100-(FNDC_SOC));
 int TargetGPUse;
+//int	sellAMPs=L1_SELL_AMPS+L2_SELL_AMPS-L1_BUY_AMPS-L1_BUY_AMPS;
+static int GTpause=0;
 static int weight=0, trigger=20000;
-	if (AC1InLimit!=45){ cmdMate("AC1INLM","45",__LINE__); AC1InLimit=45; }
+	if (AC1InLimit!=45){ cmdMate("AC1INLM","45",__LINE__); AC1InLimit=45; cmdMate("SELL","1",__LINE__);}
 	WMVPRINTW(FNDCWin,5,2,"%s                    ","");
 	TargetGPUse=500+(SOD*SOD*SOD);
-	weight+=((ngp>0) ? (ngp-TargetGPUse) : ((ngp*2)-TargetGPUse)*2);
+	if (GTpause-- >0)return; else if(GTpause<0) GTpause=0;
+	if(ANGP>500 && loadBalance!= 1 && GT_NoDrop){
+		loadBalance=1;
+		logMesg("Setting loadBalance=1 ANGP==%d GT_NoDrop==%d MM@%d\n",ANGP,GT_NoDrop,__LINE__);
+		GTpause=3;
+		return;
+	}else if(ANGP< (-100) && loadBalance!= -1 && GT_NoDrop){
+		loadBalance= -1;
+		logMesg("Setting loadBalance= -1 ANGP==%d GT_NoDrop==%d MM@%d\n",ANGP,GT_NoDrop,__LINE__);
+		GTpause=3;
+		return;
+	}
+		
+	weight+=((ANGP>0) ? (ANGP-TargetGPUse) : ((ANGP*2)-TargetGPUse)*2);
 	if (abs(weight)>=trigger) // Weight triggered an event
 	{
 		if (weight>0) // Load is too high. Reduce load -- water heater or battery charging volts.
@@ -994,15 +1093,20 @@ static int weight=0, trigger=20000;
 			}
 			else 	// reduce water heater power
 			{
-				if (!UnderUtilization){
+				if (!UnderUtilization && GT_NoDrop && loadBalance!=1){
+					loadBalance=1;
+					logMesg("Setting loadBalance= 1 ANGP==%d GT_NoDrop==%d sellv==%d, SellVoltMin==%d invbattv==%d MM@%d\n",
+													ANGP,GT_NoDrop,sellv, SellVoltMin, invbattv,__LINE__);
 //					whsSetFlags(whsAuto,whsOff);
 				}
 			}
 		}
 		else //weight < 0 - Load is too low.  Increase load. 
 		{
-			if (((whsSetFlags(whsAuto,whsInquiry)!=whsOn)) && (TargetGPUse<1000)){
-				whsSetFlags(whsAuto,whsOn);
+			if ((TargetGPUse<1000) && (loadBalance != -1) && GT_NoDrop){
+				loadBalance= (-1);
+				logMesg("Setting loadBalance= -1 ANGP==%d GT_NoDrop==%d TargetGPUse==%d MM@%d\n",
+													ANGP,GT_NoDrop,TargetGPUse,__LINE__);
 			}
 			else 	// raise battery charging volts
 			{
@@ -1023,8 +1127,8 @@ static int weight=0, trigger=20000;
 	}
 	else
 	{
-		if (((weight<0) && (digitalRead(WH_LOWER_ELEMENT)==1) && sellv>= SellVoltMax ) ||
-			((weight>0) && ((digitalRead(WH_LOWER_ELEMENT)==0) && sellv<= SellVoltMin ) ))
+		if (((weight<0) && (LE_IS_ON_FULL) && sellv>= SellVoltMax ) ||
+			((weight>0) && ((LE_IS_OFF) && sellv<= SellVoltMin ) ))
 		{
 			weight=0;
 		}	
@@ -1032,7 +1136,7 @@ static int weight=0, trigger=20000;
 	WMVPRINTW(FNDCWin,5,2,"T %5d W %7d",TargetGPUse,weight);
 	if ((DropSelected) && ((FNDC_SOC)>(MIN_SOC_DROPPED))){
 	static int tmr=0;
-		if (((MaxNegBatAmpsDropped)*INVEFF) < (netbattamps-((ngp*10)/invbattv))){
+		if (((MaxNegBatAmpsDropped)*INVEFF) < (ANBA-((ANGP*10)/AFNDCV))){
 			if (tmr++ > 30){
 				cmdMate("AC","0",__LINE__);
 				ADJ_SELLV(SellVoltMin);
@@ -1104,9 +1208,10 @@ int SOC=(int)((((float)BATT_STATUS_AH+ (float)BatRatedAmpHr)/(float)BatRatedAmpH
 	}
 #define WHSPREAD 		10
 #define WHMULTIPLIER 	3
-	if ((!UnderUtilization) && (whsSetFlags(whsAuto,whsInquiry)==whsOn)	&& (FNDC_BATT_VOLTS<55.0)
-							&& (netbattamps < ((MIN(((100-WHSPREAD)-SOC),0)*WHMULTIPLIER)))){
-		whsSetFlags(whsAuto,whsOff);
+/*	if ((!UnderUtilization) && (whsSetFlags(whsAuto,whsInquiry)==whsOn)	&& (aFNDCvolts<55.0)
+							&& (ANBA < ((MIN(((100-WHSPREAD)-SOC),0)*WHMULTIPLIER)))){
+		//whsSetFlags(whsAuto,whsOff);
+		loadBalance=1;
 		BelowSellvSecs=0;
 		pause=5;
 		return;
@@ -1114,19 +1219,20 @@ int SOC=(int)((((float)BATT_STATUS_AH+ (float)BatRatedAmpHr)/(float)BatRatedAmpH
 	else 
 	{		
 		if ((whsSetFlags(whsAuto,whsInquiry)!=whsOn) &&
-						(((netbattamps > ((MIN((100-SOC),WHSPREAD)*WHMULTIPLIER))) && (FNDC_BATT_VOLTS>51.2)) ||
-						(FNDC_BATT_VOLTS>56.8))){
+						(((ANBA > ((MIN((100-SOC),WHSPREAD)*WHMULTIPLIER))) && (aFNDCvolts>51.2)) ||
+						(aFNDCvolts>56.8))){
+			loadBalance= -1;
 			whsSetFlags(whsAuto,whsOn);
 			pause=5;
 			return;
 		}
-	}
+	}*/
 	{static int ltNegAmps=0;	
 		if (SOC<(MIN_SOC_DROPPED)){
-			if ((whsSetFlags(whsAuto,whsInquiry)==whsOn) && (!UnderUtilization)){
+/*			if ((whsSetFlags(whsAuto,whsInquiry)==whsOn) && (!UnderUtilization)){
 				whsSetFlags(whsAuto,whsOff);
 				pause=5;
-			}
+			}*/
 			SWITCH_TO_GRID(12) 
 		}
 		else
@@ -1140,7 +1246,7 @@ int SOC=(int)((((float)BATT_STATUS_AH+ (float)BatRatedAmpHr)/(float)BatRatedAmpH
 			ltNegAmps--;
 		}*/
 		{
-			ltNegAmps+=(netbattamps-(MaxNegBatAmpsDropped));
+			ltNegAmps+=(ANBA-(MaxNegBatAmpsDropped));
 			if(ltNegAmps<(-600))
 			{
 				ltNegAmps=0;
@@ -1155,13 +1261,13 @@ void mrCool(void)
 {//MC_On_Temp+=0.25;
 	if(MrCoolMode==1)//1 is cool
 	{
-		if((MCRoomTemp<=MC_Off_Temp) && ((PrgDataStruct.SOC_Targ >= FNDC_SOC)||((CC1_AMPS+CC2_AMPS)<15))) setACPS(acpsNone);
-		if((MCRoomTemp>=MC_On_Temp)&&(AirCondPwrSrc==acpsNone)) setACPS(acpsOn);
+		if((MCRoomTemp<=MC_Off_Temp) && ((PrgDataStruct.SOC_Targ >= FNDC_SOC)||((CC1_AMPS+CC2_AMPS)<15))){ setACPS(acpsNone);}
+		if((MCRoomTemp>=MC_On_Temp)&&(AirCondPwrSrc==acpsNone)) {setACPS(acpsOn);}
 	}
 	else //0 is heat
 	{
-		if((MCRoomTemp>=MC_Off_Temp) && ((PrgDataStruct.SOC_Targ >= FNDC_SOC)||((CC1_AMPS+CC2_AMPS)<15))) setACPS(acpsNone);
-		if((MCRoomTemp<=MC_On_Temp)&&(AirCondPwrSrc==acpsNone)) setACPS(acpsOn);
+		if((MCRoomTemp>=MC_Off_Temp) && ((PrgDataStruct.SOC_Targ >= FNDC_SOC)||((CC1_AMPS+CC2_AMPS)<15))) {setACPS(acpsNone);}
+		if((MCRoomTemp<=MC_On_Temp)&&(AirCondPwrSrc==acpsNone)) {setACPS(acpsOn);}
 	}
 }
 
@@ -1199,8 +1305,11 @@ int CC1Mode=CC1_MODE, CC2Mode=CC2_MODE;
 	UnderUtilization=((CC1Mode==1) || (CC1Mode==3) || (CC2Mode==1) || (CC2Mode==3));
 	ngp = ((L1_CHARGER_AMPS+L1_BUY_AMPS-L1_SELL_AMPS)*L1_INVERTER_VOUT)
 									+((L2_CHARGER_AMPS+L2_BUY_AMPS-L2_SELL_AMPS)*L2_INVERTER_VOUT);
+	updateANGP();
+	updateAFNDCvolts();
 	invbattv=(int)(INVERTERVOLTS*10);
 	netbattamps=((FNDC_SHUNT_A_AMPS)+(FNDC_SHUNT_B_AMPS)+(FNDC_SHUNT_C_AMPS));
+	updateANBA();
 	if (netbattamps	> 0.0){
 		if ((FNDC_BATT_VOLTS <= 51.2) || (/*netbattamps*/ ADJNETBATTAMPS > ((FNDC_BATT_VOLTS-51.0)*1.6)) || (BATT_STATUS_AH<(-0.05)))
 		{ 
@@ -1226,7 +1335,7 @@ int CC1Mode=CC1_MODE, CC2Mode=CC2_MODE;
 			ALARM_TIMMER(td,900ul,180,240)
 			{
 				sprintf(strtmp,"Excess power is available and has no where to go!");
-				wprintw(ScrollWin,"SMS_SendMsg returned %d. Msg: %s\n",SMS_SendMsg("2814509680",strtmp),strtmp);
+				logMesg("SMS_SendMsg returned %d. Msg: %s\n",SMS_SendMsg("2814509680",strtmp),strtmp);
 				SoundAlarm(200);
 			}
 /*			wprintw(ScrollWin,"%lu\t%lu\t%lu\t%d\t%d\t%d\t\%lu\n",__LINE__,
@@ -1326,20 +1435,20 @@ int CC1Mode=CC1_MODE, CC2Mode=CC2_MODE;
 }
 
 int compressor(int SwOn){
-	time_t	lastOffTime=0;
+	static time_t	lastOffTime=0;
 	switch (SwOn)
 	{
 		case OFF:
 			if (digitalRead(COMPRESSOR_CTRL_PIN)){
 				digitalWrite(COMPRESSOR_CTRL_PIN,OFF);
-				wprintw(ScrollWin,"@ %d:%d Compressor off.\n",hour,minute);
+				logMesg("@ %d:%d Compressor off.\n",hour,minute);
 				lastOffTime=epoch_time;
 			}
 			break;
 		case  ON:
 			if (!digitalRead(COMPRESSOR_CTRL_PIN) && difftime(epoch_time,lastOffTime)>180){
 				digitalWrite(COMPRESSOR_CTRL_PIN,ON);
-				wprintw(ScrollWin,"@ %d:%d Compressor on.\n",hour,minute);
+				logMesg("@ %d:%d Compressor on.\n",hour,minute);
 			}
 			break;
 		case ASK:
@@ -1430,10 +1539,10 @@ void ProcessUserInput(void){
 			}
 			else 
 			{
-				if (KBLock==1) { wprintw(ScrollWin,"Keyboard locked.\n");return; }
+				if (KBLock==1) { logMesg("Keyboard locked.\n");return; }
 			}
 			SoundAlarm(70);
-			wprintw(ScrollWin,"\n%c key pressed...\t",ch);
+			logMesg("%c key pressed...\n",ch);
 			switch (ch)
 			{
 			case 'A':
@@ -1532,12 +1641,12 @@ void ProcessUserInput(void){
 				SEND_SMS_STAT_RPT
 				break;
 			case 'o':  
-				UE_PWM.Off--;
-				wprintw(ScrollWin,"powerFactor=%d\n",UE_PWM.Off);
+				//UE_PWM.Off--;
+				//logMesg("powerFactor=%d\n",UE_PWM.Off);
 				break;
 			case 'O':  
-				UE_PWM.Off++;
-				wprintw(ScrollWin,"powerFactor=%d\n",UE_PWM.Off);
+				//UE_PWM.Off++;
+				//logMesg("powerFactor=%d\n",UE_PWM.Off);
 				break;				
 			case 'P':
 				ProgramIndx++; if (ProgramIndx>PrgMaxIndx) ProgramIndx=0;
@@ -1629,6 +1738,7 @@ void ProcessUserInput(void){
 				break;
 			case '2':
 				InvInputMode=GridTied;
+				cmdMate("SELL","1",__LINE__);
 				break;
 			case '3':
 				InvInputMode=UPS;
@@ -1652,7 +1762,7 @@ void ProcessUserInput(void){
 				digitalWrite(MRCOOL2KHP_SRC_GPIO,0);
 				break;
 			case	'(':
-				vacation=TRUE;wprintw(ScrollWin,"vacation=TRUE\n");
+				vacation=TRUE;logMesg("vacation=TRUE\n");
 				break;
 			case	')'	:
 				vacation=FALSE;//default
@@ -1661,7 +1771,7 @@ void ProcessUserInput(void){
 				digitalWrite(WH_LOWER_ELEMENT_SRC,INVERTER);	//low volt managed src from inverter
 				wh_le_src=INVERTER;
 				WhLEGridGoal=50.0;
-				wprintw(ScrollWin,"Lower WH element on inverter\n");
+				logMesg("Lower WH element on inverter\n");
 				break;
 			case	':'	:
 				if (digitalRead(WH_LOWER_ELEMENT_SRC)==INVERTER)
@@ -1669,7 +1779,7 @@ void ProcessUserInput(void){
 					WhLEGridGoal=readSensorF(4,666.6)+5.0;
 					digitalWrite(WH_LOWER_ELEMENT_SRC,GRID);	//high volt mechanical thermostat src from grid
 					wh_le_src=GRID;
-					wprintw(ScrollWin,"Lower WH element on grid\n");
+					logMesg("Lower WH element on grid\n");
 				}
 				else
 				{
@@ -1696,7 +1806,7 @@ void printStuff(void){
 	WMVPRINTW(InvWin,4,2,"Chg   %2d %2d Amps",L1_CHARGER_AMPS,L2_CHARGER_AMPS);
 	WMVPRINTW(InvWin,5,2,"Buy   %2d %2d %6.3f ",L1_BUY_AMPS,L2_BUY_AMPS,BuyWH/1000);
 	WMVPRINTW(InvWin,6,2,"Sell  %2d %2d %6.3f",L1_SELL_AMPS,L2_SELL_AMPS,SellWH/1000);
-	WMVPRINTW(InvWin,7,2,"NetGP %5d %s Watts",ngp,(ngp>0) ? "$$$":"   ");
+	WMVPRINTW(InvWin,7,2,"NetGP %5d %s Watts",ANGP,(ANGP>0) ? "$$$":"   ");
 	WMVPRINTW(InvWin,8,2,"Aux  %2d%2d%2d %2d %2d %2d",(digitalRead(WH_UPPER_ELEMENT)), (digitalRead(WH_LOWER_ELEMENT_HV))
 					,(digitalRead(WH_LOWER_ELEMENT)!=0),(/*INVERTER_AUX_OUT!=0*/compressor(ASK)),(vacation),digitalRead(AIR_JORDAN_SRC_PIN));
 	WMVPRINTW(InvWin,9,1,"InvPwr %5d %6.3f ", InverterPwr, InvWH/1000);
@@ -1717,23 +1827,16 @@ void printStuff(void){
 									CC1_AMPS*CC1_BATT_VOLTS+CC2_AMPS*CC2_BATT_VOLTS);
 	WMVPRINTW(CCWin,8,2,"%Rating %5.1f%%",	(CC1_AMPS*CC1_BATT_VOLTS+CC2_AMPS*CC2_BATT_VOLTS)/(ArrayRatedWatts/100));
 
-/*	WMVPRINTW(CCWin,9,2,"M%1d A%1d T%1d DT%1d C%1d S%1d TE%d",whsSetFlags(whsManual,whsInquiry),whsSetFlags(whsAuto,whsInquiry),
-			whsSetFlags(whsTimer,whsInquiry),whsSetFlags(whsDisableTimer,whsInquiry),
-			whsSetFlags(whsConserve,whsInquiry), whGetDesiredState(**digitalRead(WH_LOWER_ELEMENT),INVERTER_AUX_OUT,*/
-/*			(L1_INVERTER_AMPS+L1_CHARGER_AMPS+L1_BUY_AMPS-L1_SELL_AMPS),
-			(L2_INVERTER_AMPS+L2_CHARGER_AMPS+L2_BUY_AMPS-L2_SELL_AMPS)),digitalRead(WH_UPPER_ELEMENT));*/
-//	WMVPRINTW(CCWin,9,2,"Living F%5.1f %1s",sensor[6].tempF,((MrCoolMode==1)?"C":"H"));
 	WMVPRINTW(CCWin,9,2,"Ctrl Rm %5.1f %5.1f ",readSensorF(3,-666.9),WhLEGridGoal);
 	WMVPRINTW(CCWin,10,2,"%02d:%02d:%02d  %02d:%02d:%02d",hour,minute,second,ResetTime_p.tm_hour,ResetTime_p.tm_min
 															,ResetTime_p,ResetTime_p.tm_sec);
-	WMVPRINTW(CCWin,11,2,"   %5.1f        >%3.0f",readSensorF(2,666.6),WHtopMinTemp);									
-	WMVPRINTW(CCWin,12,2,"%5.1f %5.1f  %s >%3.0f", readSensorF(4,666.6),readSensorF(1,666.6)
-									,(digitalRead(WH_UPPER_ELEMENT) ? "^ " : "  "), WHCenterMinTemp);
-	WMVPRINTW(CCWin,13,2,"%1s  %5.1f  %3s%s %5.1f",((digitalRead(WH_LOWER_ELEMENT_SRC)==INVERTER)?"I":"G"),readSensorF(0,666.6) 
-											,((digitalRead(WH_LOWER_ELEMENT_HV) && digitalRead(WH_LOWER_ELEMENT)) ? "^^^" : "  ")
-											,(digitalRead(WH_LOWER_ELEMENT) ? "^ " : "  "),readSensorF(7,777.7));
-//	WMVPRINTW(CCWin,13,1,"%5.1f %5.1f %5.1f %5.1f",sensor[0].tempF,sensor[1].tempF,sensor[2].tempF,sensor[4].tempF);
-	WMVPRINTW(FNDCWin,0,2,"BattV %3.1f ",FNDC_BATT_VOLTS);
+	WMVPRINTW(CCWin,11,2,"   %5.1f    %3d%% >%3.0f",readSensorF(2,666.6),UE_PWM.percent,WHtopMinTemp);									
+	WMVPRINTW(CCWin,12,2,"%5.1f %5.1f %3d%% >%3.0f", readSensorF(4,666.6),readSensorF(1,666.6),LE_PWM.percent
+									, WHCenterMinTemp);
+	WMVPRINTW(CCWin,13,2,"%1s  %5.1f     %5.1f",((digitalRead(WH_LOWER_ELEMENT_SRC)==INVERTER)?"I":"G"),readSensorF(0,666.6) 
+											,readSensorF(7,777.7));
+
+	WMVPRINTW(FNDCWin,0,2,"BattV %3.1f ",AFNDCV/*FNDC_BATT_VOLTS*/);
 	WMVPRINTW(FNDCWin,1,2,"SOC   %4d%% Days %4.1f    G %06.0f ",FNDC_SOC,DaysSinceFull,CwattHoursGen);
 	WMVPRINTW(FNDCWin,2,2,"Amps %6.0f %5.0f %5.1f  P %06.0f ",FNDC_SHUNT_A_AMPS,FNDC_SHUNT_B_AMPS,FNDC_SHUNT_C_AMPS,CwattHoursPump);
 	WMVPRINTW(FNDCWin,3,2,"Net Amps%6.1f             ",netbattamps);
@@ -1747,6 +1850,7 @@ void printStuff(void){
 	WMVPRINTW(FNDCWin,3,18,"%s","              ");
 	if (InvInputMode==GridTied){
 		WMVPRINTW(FNDCWin,12,2,"%s         ",((DropSelected) ? "DS":"--"))
+		WMVPRINTW(FNDCWin,3,18,"AvgNBA: %4.1f",ANBA);
 	}
 	else if (InvInputMode==Support){
 		WMVPRINTW(FNDCWin,3,18,"Target: %4.1f",BatTrgAmp);
@@ -1811,47 +1915,52 @@ void signalIntHandler(int signo)
 	if (signo==SIGINT) terminate = true;
 }
 
+#define POWER(ohms,volts)	((volts^2)/ohms)
+	
 PI_THREAD (togglePin)
 {
+	const int CycleMicroSec=16480;
+
 	while(1)
 	{	
-		if(++UE_PWM.c>=UE_PWM.Len)
+		PWM_Debug_count++;
+		if((UE_PWM.count+=(100/UE_PWM.resolution)) >= 100)
 		{
-			UE_PWM.c=0;
-			if(UE_PWM.Off>0)digitalWrite(WH_UPPER_ELEMENT,1);
+			if(UE_PWM.percent>0)digitalWrite(WH_UPPER_ELEMENT,1);
+			UE_PWM.count=0;
+		}else{
+			if(UE_PWM.count >= UE_PWM.percent)digitalWrite(WH_UPPER_ELEMENT,0);
 		}
-		if(UE_PWM.c==UE_PWM.Off)digitalWrite(WH_UPPER_ELEMENT,0);
-		delay(10);
+		
+		if((LE_PWM.count+=(100/LE_PWM.resolution)) >= 100)
+		{
+			if(LE_PWM.percent>0)digitalWrite(WH_LOWER_ELEMENT,1);
+			LE_PWM.count=0;
+		}else{
+			if(LE_PWM.count >= LE_PWM.percent)digitalWrite(WH_LOWER_ELEMENT,0);
+		}
+		delayMicroseconds(CycleMicroSec);//delay one cycle length
 	}
 	return 0;
 }
 
 int main( int argc, char *argv[]) 
 { 
-//	struct sigaction sa;
-//	struct itimerval itimer;
-	mmlog=fopen("/var/log/mm.log","a");
+
 	terminate=false;
 	if (signal(SIGINT,signalIntHandler)== SIG_ERR) return 5;
-	UE_PWM.c=0;
-	UE_PWM.Off=50;
-	UE_PWM.Len=100;
-	//piThreadCreate(togglePin);
-	/*
-	memset (&sa,0,sizeof(sa));
-	sa.sa_handler=&timer_handler;
-	sigaction(SIGVTALRM,&sa,NULL);*/
-	/*
-	itimer.it_value.tv_sec=30;
-	itimer.it_value.tv_usec=0;
-	itimer.it_interval.tv_sec=30;
-	itimer.it_interval.tv_usec=0;
-	setitimer(ITIMER_REAL, &itimer, NULL);*/
-	//pulsate(WH_UPPER_ELEMENT,20);
+	UE_PWM.count=0;
+	UE_PWM.resolution=5;
+	UE_PWM.percent=0;
+	LE_PWM.count=40;
+	LE_PWM.resolution=5;
+	LE_PWM.percent=0;
+	piThreadCreate(togglePin);
+
 	IAO_Day_Secs=0;
 	IAR_Day_Secs=0;
 	SellWH=0;
-	invMode=-1;
+	invMode=(-1);
 	wiringPiSetupGpio () ;
 	pinMode(AIR_COND_GPIO_PIN,OUTPUT);
 	pinMode(AIR_JORDAN_SRC_PIN,OUTPUT);
@@ -1962,7 +2071,14 @@ int main( int argc, char *argv[])
 //	close(sock); 
 /*	fclose(fp);*/
 	close(usbmate);
-	fclose(mmlog);
+//	fclose(mmlog);
+	persistantData=fopen("persistant.ini","w");
+	if(persistantData==NULL){
+		perror("Unable to open persistant.ini");
+		exit(1);
+	}
+	fprintf(persistantData,"%f        %f       ", CwattHoursPump, CwattHoursGen);
+	fclose(persistantData);
 	echo();
 	attroff(COLOR_PAIR(8));
 	endwin();
