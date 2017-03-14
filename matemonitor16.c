@@ -214,7 +214,7 @@ struct angpAverager
   int tot;
   int avg;
   int indx;
-  int history[20];
+  int history[10];
 } angp;
 
 int
@@ -222,9 +222,9 @@ updateANGP (void)
 {
   angp.tot = angp.tot - angp.history[angp.indx] + ngp;
   angp.history[angp.indx++] = ngp;
-  if (angp.indx >= 20)
+  if (angp.indx >= 10)
     angp.indx = 0;
-  return (angp.avg = ((angp.tot + ngp) / 21));
+  return (angp.avg = ((angp.tot + ngp) / 11));
 }
 
 struct
@@ -310,6 +310,24 @@ cmdMate (char *cmd, char *v, int ibookmark)
   logMesg ("LastCMD <%7s:%-4s>%4d %4d\n", cmd, v, ibookmark, iLastBookmark);
   iLastBookmark = ibookmark;
   MateCommResponseExpected = YES;
+}
+
+void
+SetSellVmax (int NewSellVmax, int lineNum)
+{
+  char tbuff[32];
+  sprintf (tbuff, "%3d", NewSellVmax + 8);
+  cmdMate ("ABSORBV", tbuff, lineNum);
+  SellVoltMax = NewSellVmax;
+}
+
+void
+SetSellVmin (int NewSellVmin, int lineNum)
+{
+  char tbuff[32];
+  sprintf (tbuff, "%3d", NewSellVmin);
+  cmdMate ("FLOATV", tbuff, lineNum);
+  SellVoltMin = NewSellVmin;
 }
 
 void
@@ -683,7 +701,7 @@ TimeEvents (void)
 	      if (InvInputMode == GridTied)
 		{
 		  MaxNegBatAmpsDropped = (-40);
-		  SellVoltMin = 504;
+		  SetSellVmin (504, __LINE__);
 		}
 	      SEND_SMS_STAT_RPT;
 	    }
@@ -714,8 +732,8 @@ TimeEvents (void)
 	  break;
 	case 12:
 	  break;
-	case 13:
-	  if (TimeTest (13, 0, 0) && (FNDC_SOC < 93)
+	case 15:
+	  if (TimeTest (15, 0, 0) && (FNDC_SOC < 93)
 	      && (InvInputMode == GridTied))
 	    {
 	      if (sellv < 516)
@@ -725,19 +743,19 @@ TimeEvents (void)
 		}
 	      if (SellVoltMin < 516)
 		{
-		  SellVoltMin = 516;
+		  SetSellVmin (516, __LINE__);
 		}
 	      if (MaxNegBatAmpsDropped < (-30))
 		{
 		  MaxNegBatAmpsDropped = (-30);
 		}
 	    }
-	  if (TimeTest (13, 30, 0) && (BathDone == FALSE)
+	  if (TimeTest (15, 30, 0) && (BathDone == FALSE)
 	      && (WHtopMinTemp < 125.0))
 	    WHtopMinTemp = 125.0;
 	  break;
-	case 14:
-	  if (TimeTest (14, 0, 0) && (FNDC_SOC < 98)
+	case 16:
+	  if (TimeTest (16, 0, 0) && (FNDC_SOC < 98)
 	      && (InvInputMode == GridTied))
 	    {
 	      if (sellv < 520)
@@ -747,14 +765,14 @@ TimeEvents (void)
 		}
 	      if (SellVoltMin < 520)
 		{
-		  SellVoltMin = 520;
+		  SetSellVmin (520, __LINE__);
 		}
 	      if (MaxNegBatAmpsDropped < (-25))
 		{
 		  MaxNegBatAmpsDropped = (-25);
 		}
 	    }
-	  if (TimeTest (14, 15, 0))
+	  if (TimeTest (16, 15, 0))
 	    {
 	      SEND_SMS_STAT_RPT;
 	      if (BathDone == FALSE)
@@ -766,8 +784,8 @@ TimeEvents (void)
 		}
 	    }
 	  break;
-	case 15:
-	  if (TimeTest (15, 0, 0) && (FNDC_SOC < 99)
+	case 17:
+	  if (TimeTest (17, 0, 0) && (FNDC_SOC < 99)
 	      && (InvInputMode == GridTied))
 	    {
 	      if (sellv < 540)
@@ -777,43 +795,43 @@ TimeEvents (void)
 		}
 	      if (SellVoltMin < 540)
 		{
-		  SellVoltMin = 540;
+		  SetSellVmin (540, __LINE__);
 		}
 	      if (MaxNegBatAmpsDropped < (-20))
 		{
 		  MaxNegBatAmpsDropped = (-20);
 		}
 	    }
-	  if (TimeTest (15, 15, 0))
+	  if (TimeTest (17, 15, 0))
 	    {
 	      SEND_SMS_STAT_RPT;
 	    }
-	  if ((TimeTest (15, 30, 0)) && (InvInputMode == GridTied))
+	  if ((TimeTest (17, 30, 0)) && (InvInputMode == GridTied))
 	    {
 	      MaxNegBatAmpsDropped = (-4);
 	      DropSelected = 0;
 	      if (SellVoltMin < 540)
-		SellVoltMin = 540;
+		SetSellVmin (540, __LINE__);
 	      if (sellv < 540)
 		{
 		  cmdMate ("SELLV", "540", __LINE__);
 		  sellv = 540;
 		}
 	    }
-	case 16:
-	  if ((TimeTest (16, 0, 0)) && (InvInputMode == GridTied))
+	case 18:
+	  if ((TimeTest (18, 0, 0)) && (InvInputMode == GridTied))
 	    {
 	      MaxNegBatAmpsDropped = (-4);
 	      DropSelected = 0;
 	      if (SellVoltMin < 560)
-		SellVoltMin = 560;
+		SetSellVmin (560, __LINE__);
 	      if (sellv < 560)
 		{
 		  cmdMate ("SELLV", "560", __LINE__);
 		  sellv = 560;
 		}
 	    }
-	  if (TimeTest (16, 45, 0))
+	  if (TimeTest (18, 45, 0))
 	    {
 	      if (BathDone == FALSE)
 		{
@@ -824,15 +842,15 @@ TimeEvents (void)
 	    }
 	  break;
 
-	case 17:
+	case 19:
 
-	  if (TimeTest (17, 15, 0))
+	  if (TimeTest (19, 15, 0))
 	    {
 	      wh_le_src = INVERTER;
 	      WhLEGridGoal = 50.0;
 	      logMesg ("Lower WH element on inverter\n");
 	    }
-	  if (TimeTest (17, 30, 0) && (InvInputMode == GridTied))
+	  if (TimeTest (19, 30, 0) && (InvInputMode == GridTied))
 	    {
 	      if (sellv > 528)
 		{
@@ -841,12 +859,12 @@ TimeEvents (void)
 		}
 	      if (SellVoltMin > 528)
 		{
-		  SellVoltMin = 528;
+		  SetSellVmin (528, __LINE__);
 		}
 	      MaxNegBatAmpsDropped = (0);
 	    }
 
-	  if (TimeTest (17, 15, 0))
+	  if (TimeTest (19, 15, 0))
 	    {
 	      if (WHCenterMinTemp > 110.0)
 		WHCenterMinTemp = 110.0;
@@ -854,7 +872,7 @@ TimeEvents (void)
 		WHtopMinTemp = 120.0;
 	    }
 	  break;
-	case 19:
+	case 20:
 	  if ((BathDone == FALSE) && (TimeTest (-1, -1, 30)))
 	    {
 	      float WHTTD = (readSensorF (2, 666.6) - WHtopMinTemp);
@@ -863,11 +881,11 @@ TimeEvents (void)
 		WHCenterMinTemp = 110.0 - WHTTD;
 	    }
 	  break;
-	case 20:
-	  if (TimeTest (20, 0, 5))
+	case 21:
+	  if (TimeTest (21, 0, 5))
 	    if (WHCenterMinTemp > 90.0)
 	      WHCenterMinTemp = 90.0;
-	  if (TimeTest (20, 0, 33))
+	  if (TimeTest (21, 0, 33))
 	    {
 	      if (((FNDC_SOC > 95) && (DaysSinceFull > 1.5))
 		  || (DaysSinceFull > 3))
@@ -888,7 +906,7 @@ TimeEvents (void)
 		    }
 		  if (SellVoltMin > 516)
 		    {
-		      SellVoltMin = 516;
+		      SetSellVmin (516, __LINE__);
 		    }
 		}
 	      MaxNegBatAmpsDropped = (-3);
@@ -909,7 +927,7 @@ TimeEvents (void)
 		}
 	      if (SellVoltMin > 516)
 		{
-		  SellVoltMin = 516;
+		  SetSellVmin (516, __LINE__);
 		}
 	    }
 	  break;
@@ -1056,7 +1074,7 @@ SOC_VarToTrg (void)
 #define ANTIHYSTERESIS 3
 #define DROP_GRID(PAUSE,FIXED_AMPS)	{cmdMate("AC","0",__LINE__); pause=PAUSE; \
 								MaxNegBatAmpsDropped=MIN(0,(BatTrgAmp-FIXED_AMPS)); \
-								cmdMate("AC1INLM","45",__LINE__); AC1InLimit=45;}
+								cmdMate("AC1INLM","45",__LINE__); AC1InLimit=45;LE_PWM.resolution=PWM_OFFGRID_RESOLUTION;}
 #define ADJ_SELLV(NEWSELLV)	{		sprintf(strtmp,"%d",NEWSELLV);\
 									cmdMate("SELLV",strtmp,__LINE__);\
 									sellv=NEWSELLV;}
@@ -1470,6 +1488,7 @@ ControlGridTieUse (void)
 	  if (tmr++ > 30)
 	    {
 	      cmdMate ("AC", "0", __LINE__);
+	      LE_PWM.resolution=PWM_OFFGRID_RESOLUTION;
 	      ADJ_SELLV (SellVoltMin);
 	      tmr = 0;
 	      GTpause = 3;
@@ -1490,7 +1509,8 @@ ControlGridTieUse (void)
 #define SWITCH_TO_GRID(PAUSE)	if ((!UnderUtilization && ((FNDC_BATT_VOLTS<54.0)&&((vacation==FALSE)||(hour>=15)||(FNDC_SOC<90))))|| \
 									(FNDC_BATT_VOLTS<46.0)||(FNDC_SHUNT_A_AMPS<(-200))) \
 										{cmdMate("AC","1",__LINE__);   \
-										cmdMate("AC1INLM","45",__LINE__);SavedSOC=0; pause=PAUSE;BelowSellvSecs=0;}
+										cmdMate("AC1INLM","45",__LINE__);SavedSOC=0; pause=PAUSE;BelowSellvSecs=0; \
+										LE_PWM.resolution=PWM_ONGRID_RESOLUTION;}
 #define BELOWSELLVSECSTRIG	(-1800)	//tenths of a volt * number of secs or decavolt secs
 #define BELOWSELLVSECSMAX	1200
 #define VDIFF	((FNDC_BATT_VOLTS*10)-(sellv))
@@ -1503,7 +1523,8 @@ DroppedGrid (void)
     (int) ((((float) BATT_STATUS_AH +
 	     (float) BatRatedAmpHr) / (float) BatRatedAmpHr) * 100.0);
 
-  if ((FNDC_BATT_VOLTS < MIN_VOLTS_DROPPED)  || (GT_NoDrop && (InvInputMode==GridTied)))
+  if ((FNDC_BATT_VOLTS < MIN_VOLTS_DROPPED)
+      || (GT_NoDrop && (InvInputMode == GridTied)))
     SWITCH_TO_GRID (0);
 
   BelowSellvSecs += VDIFF;
@@ -1763,6 +1784,8 @@ think (void)
     }
 }
 
+volatile int compressorOn = 1;
+
 int
 compressor (int SwOn)
 {
@@ -1771,25 +1794,25 @@ compressor (int SwOn)
   switch (SwOn)
     {
     case OFF:
-      if (digitalRead (COMPRESSOR_CTRL_PIN))
+      if ( /*digitalRead (COMPRESSOR_CTRL_PIN) */ compressorOn)
 	{
-	  digitalWrite (COMPRESSOR_CTRL_PIN, OFF);
+	  /*digitalWrite (COMPRESSOR_CTRL_PIN, OFF) */ compressorOn = 0;
 	  logMesg ("@ %d:%d Compressor off.\n", hour, minute);
 	  lastOffTime = epoch_time;
 	}
       break;
     case ON:
-      if (!digitalRead (COMPRESSOR_CTRL_PIN)
+      if (!compressorOn		/*digitalRead (COMPRESSOR_CTRL_PIN) */
 	  && difftime (epoch_time, lastOffTime) > 180)
 	{
-	  digitalWrite (COMPRESSOR_CTRL_PIN, ON);
+	  /*digitalWrite (COMPRESSOR_CTRL_PIN, ON) */ compressorOn = 1;
 	  logMesg ("@ %d:%d Compressor on.\n", hour, minute);
 	}
       break;
     case ASK:
       break;
     }
-  return digitalRead (COMPRESSOR_CTRL_PIN);
+  return /*digitalRead (COMPRESSOR_CTRL_PIN) */ compressorOn;
 
 
 }
@@ -1917,6 +1940,7 @@ ProcessUserInput (void)
 	  break;
 	case 'D':		// drop grid now and allow grid tie function to drop
 	  cmdMate ("AC", "0", __LINE__);
+	  LE_PWM.resolution=PWM_OFFGRID_RESOLUTION;
 	case 'd':		// allow grid tie function to drop
 	  DropSelected = 1;
 	  break;
@@ -1966,12 +1990,21 @@ ProcessUserInput (void)
 	  KBLock = 1;
 	  break;
 	case 'M':		//Raise the maximum sellv
-	  SellVoltMax += 4;
+	  SetSellVmax (SellVoltMax + 4, __LINE__);
+	  /*{
+	     char tbuff[32];
+	     sprintf (tbuff, "%3d", MIN (SellVoltMax + 8, 596));
+	     cmdMate ("ABSORBV", tbuff, __LINE__);
+	     } */
 	  break;
 	case 'm':		//Lower the maximum sellv
 	  if ((SellVoltMax - 4) >= SellVoltMin)
 	    {
-	      SellVoltMax -= 4;
+	      SetSellVmax (
+/*	      char tbuff[32];*/
+			    SellVoltMax - 4, __LINE__);
+//            sprintf (tbuff, "%3d", SellVoltMax + 8);
+//            cmdMate ("ABSORBV", tbuff, __LINE__);
 	    }
 	  break;
 	case 'n':
@@ -2031,17 +2064,26 @@ ProcessUserInput (void)
 	  break;
 	case 'U':		// use grid now
 	  cmdMate ("AC", "1", __LINE__);
+          LE_PWM.resolution=PWM_ONGRID_RESOLUTION;
 	case 'u':		// set use grid flag
 	  DropSelected = 0;	//default
 	  break;
 	case 'V':		//Raise the minimum sellv
 	  if ((SellVoltMin + 4) <= SellVoltMax)
 	    {
-	      SellVoltMin += 4;
+//            char tbuff[32];
+	      SetSellVmin (SellVoltMin + 4, __LINE__);
+//            sprintf (tbuff, "%3d", SellVoltMin);
+//            cmdMate ("FLOATV", tbuff, __LINE__);
 	    }
 	  break;
 	case 'v':		//Lower the minimum sellv
-	  SellVoltMin -= 4;
+	  SetSellVmin (SellVoltMin - 4, __LINE__);
+	  {
+//          char tbuff[32];
+//          sprintf (tbuff, "%3d", SellVoltMin);
+//          cmdMate ("FLOATV", tbuff, __LINE__);
+	  }
 	  break;
 	case 'W':		// turn on water heater 
 	  break;
@@ -2172,8 +2214,8 @@ printStuff (void)
 	     L2_CHARGER_AMPS);
   WMVPRINTW (InvWin, 5, 2, "Buy   %2d %2d %6.3f ", L1_BUY_AMPS, L2_BUY_AMPS,
 	     BuyWH / 1000);
-  WMVPRINTW (InvWin, 6, 2, "Sell  %2d %2d %6.3f", L1_SELL_AMPS, L2_SELL_AMPS,
-	     SellWH / 1000);
+  WMVPRINTW (InvWin, 6, 2, "Sell  %2d %2d %6.3f", L1_SELL_AMPS,
+	     L2_SELL_AMPS, SellWH / 1000);
   WMVPRINTW (InvWin, 7, 2, "NetGP %5d %s Watts", ANGP,
 	     (ANGP > 0) ? "$$$" : "   ");
   WMVPRINTW (InvWin, 8, 2, "Aux  %2d%2d%2d %2d %2d %2d",
@@ -2188,9 +2230,8 @@ printStuff (void)
   WMVPRINTW (InvWin, 11, 1, "Mode %d %8s", InvInputMode,
 	     InvInputModeLabels[InvInputMode]);
   WMVPRINTW (InvWin, 12, 1, "room temp %4.1f      ", readSensorF (3, -666.9));
-  WMVPRINTW (InvWin, 12, 1, "Wall %5.1f atic %5.1f %1s ",
-	     sensor[6].tempF, readSensorF (5, -666.9),
-	     ((MrCoolMode == 1) ? "C" : "H"));
+  WMVPRINTW (InvWin, 12, 1, "Wall %5.1f atic %5.1f %1s ", sensor[6].tempF,
+	     readSensorF (5, -666.9), ((MrCoolMode == 1) ? "C" : "H"));
   WMVPRINTW (InvWin, 13, 1, "On %4.1f Off %4.1f %1s    ", MC_On_Temp,
 	     MC_Off_Temp, (MC_On_Temp > MC_Off_Temp) ? "C" : "H");
   WMVPRINTW (CCWin, 0, 2, "BattV  %4.1f %4.1f", CC1_BATT_VOLTS,
@@ -2218,16 +2259,17 @@ printStuff (void)
   WMVPRINTW (CCWin, 10, 2, "%02d:%02d:%02d  %02d:%02d:%02d", hour, minute,
 	     second, ResetTime_p.tm_hour, ResetTime_p.tm_min, ResetTime_p,
 	     ResetTime_p.tm_sec);
-  WMVPRINTW (CCWin, 11, 2, "   %5.1f    %3d%% >%3.0f", readSensorF (2, 666.6),
-	     UE_PWM.percent, WHtopMinTemp);
-  WMVPRINTW (CCWin, 12, 2, "%5.1f %5.1f %3d%% >%3.0f", readSensorF (4, 666.6),
-	     readSensorF (1, 666.6), LE_PWM.percent, WHCenterMinTemp);
+  WMVPRINTW (CCWin, 11, 2, "   %5.1f    %3d%% >%3.0f",
+	     readSensorF (2, 666.6), UE_PWM.percent, WHtopMinTemp);
+  WMVPRINTW (CCWin, 12, 2, "%5.1f %5.1f %3d%% >%3.0f",
+	     readSensorF (4, 666.6), readSensorF (1, 666.6), LE_PWM.percent,
+	     WHCenterMinTemp);
   WMVPRINTW (CCWin, 13, 2, "%1s  %5.1f     %5.1f",
 	     ((digitalRead (WH_LOWER_ELEMENT_SRC) == INVERTER) ? "I" : "G"),
 	     readSensorF (0, 666.6), readSensorF (7, 777.7));
 
-  WMVPRINTW (FNDCWin, 0, 2, "BattV %3.1f   %3.1f   %3.2f", AFNDCV, AFNDCV / 4,
-	     AFNDCV / 24);
+  WMVPRINTW (FNDCWin, 0, 2, "BattV %3.1f   %3.1f   %3.2f", AFNDCV,
+	     AFNDCV / 4, AFNDCV / 24);
   WMVPRINTW (FNDCWin, 1, 2, "SOC   %4d%% Days %4.1f    G %06.0f ", FNDC_SOC,
 	     DaysSinceFull, CwattHoursGen);
   WMVPRINTW (FNDCWin, 2, 2, "Amps %6.0f %5.0f %5.1f  P %06.0f ",
@@ -2248,10 +2290,9 @@ printStuff (void)
   WMVPRINTW (FNDCWin, 3, 18, "%s", "              ");
   if (InvInputMode == GridTied)
     {
-      WMVPRINTW (FNDCWin, 12, 2, "%s         ",
-		 ((DropSelected) ? "DS" : "--")) WMVPRINTW (FNDCWin, 3, 18,
-							    "AvgNBA: %4.1f",
-							    ANBA);
+      WMVPRINTW (FNDCWin, 12, 18, "%s         ",
+		 ((DropSelected) ? "DS" : "--"));
+      WMVPRINTW (FNDCWin, 3, 18, "AvgNBA: %4.1f", ANBA);
     }
   else if (InvInputMode == Support)
     {
@@ -2302,11 +2343,29 @@ signalIntHandler (int signo)
     terminate = true;
 }
 
+PI_THREAD (pulseWell)
+{
+  while (1)
+    {
+      if (compressorOn)
+	{
+	  digitalWrite (COMPRESSOR_CTRL_PIN, 1);
+	}
+      else
+	{
+	  digitalWrite (COMPRESSOR_CTRL_PIN, 0);
+	}
+      delayMicroseconds (PULSE_WELL_ON_MICROS /*1050000*/);
+      digitalWrite (COMPRESSOR_CTRL_PIN, 0);
+      delayMicroseconds (PULSE_WELL_OFF_MICROS /*350000*/);
+    }
+}
+
 #define POWER(ohms,volts)	((volts^2)/ohms)
 
 PI_THREAD (togglePin)
 {
-  const int CycleMicroSec = 16550;
+  const int CycleMicroSec = 8195;
 
   while (1)
     {
@@ -2362,11 +2421,11 @@ main (int argc, char *argv[])
   UE_PWM.count = 0;
   UE_PWM.resolution = 4;
   UE_PWM.percent = 0;
-  LE_PWM.count = 40;
-  LE_PWM.resolution = 4;
+  LE_PWM.count = 50;
+  LE_PWM.resolution = 5;
   LE_PWM.percent = 0;
   piThreadCreate (togglePin);
-
+  piThreadCreate (pulseWell);
 /*	
 	fFIFO=fopen("/home/pi/projects/MateMonitor/testInput","r");
 	if(fFIFO==NULL)
