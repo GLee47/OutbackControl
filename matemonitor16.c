@@ -454,10 +454,12 @@ void
 WHpowerLevel (int OnHigh)
 {
   int state = digitalRead (WH_LOWER_ELEMENT);
+  int percent=LE_PWM.percent;
 
   if (state)
     {
       digitalWrite (WH_LOWER_ELEMENT, 0);
+      LE_PWM.percent=0;
       usleep (17000);
     }
   if (OnHigh)
@@ -470,6 +472,7 @@ WHpowerLevel (int OnHigh)
     }
   if (state)
     usleep (50000);
+  LE_PWM.percent=percent;
   digitalWrite (WH_LOWER_ELEMENT, state);
 }
 
@@ -1074,7 +1077,8 @@ SOC_VarToTrg (void)
 #define ANTIHYSTERESIS 3
 #define DROP_GRID(PAUSE,FIXED_AMPS)	{cmdMate("AC","0",__LINE__); pause=PAUSE; \
 								MaxNegBatAmpsDropped=MIN(0,(BatTrgAmp-FIXED_AMPS)); \
-								cmdMate("AC1INLM","45",__LINE__); AC1InLimit=45;LE_PWM.resolution=PWM_OFFGRID_RESOLUTION;}
+								cmdMate("AC1INLM","45",__LINE__); AC1InLimit=45; \
+								UE_PWM.resolution=PWM_OFFGRID_RESOLUTION; LE_PWM.resolution=PWM_OFFGRID_RESOLUTION;}
 #define ADJ_SELLV(NEWSELLV)	{		sprintf(strtmp,"%d",NEWSELLV);\
 									cmdMate("SELLV",strtmp,__LINE__);\
 									sellv=NEWSELLV;}
@@ -1489,6 +1493,7 @@ ControlGridTieUse (void)
 	    {
 	      cmdMate ("AC", "0", __LINE__);
 	      LE_PWM.resolution=PWM_OFFGRID_RESOLUTION;
+	      UE_PWM.resolution=PWM_OFFGRID_RESOLUTION;
 	      ADJ_SELLV (SellVoltMin);
 	      tmr = 0;
 	      GTpause = 3;
@@ -1510,7 +1515,7 @@ ControlGridTieUse (void)
 									(FNDC_BATT_VOLTS<46.0)||(FNDC_SHUNT_A_AMPS<(-200))) \
 										{cmdMate("AC","1",__LINE__);   \
 										cmdMate("AC1INLM","45",__LINE__);SavedSOC=0; pause=PAUSE;BelowSellvSecs=0; \
-										LE_PWM.resolution=PWM_ONGRID_RESOLUTION;}
+										LE_PWM.resolution=PWM_ONGRID_RESOLUTION;UE_PWM.resolution=PWM_ONGRID_RESOLUTION;}
 #define BELOWSELLVSECSTRIG	(-1800)	//tenths of a volt * number of secs or decavolt secs
 #define BELOWSELLVSECSMAX	1200
 #define VDIFF	((FNDC_BATT_VOLTS*10)-(sellv))
@@ -1941,6 +1946,7 @@ ProcessUserInput (void)
 	case 'D':		// drop grid now and allow grid tie function to drop
 	  cmdMate ("AC", "0", __LINE__);
 	  LE_PWM.resolution=PWM_OFFGRID_RESOLUTION;
+          UE_PWM.resolution=PWM_OFFGRID_RESOLUTION;
 	case 'd':		// allow grid tie function to drop
 	  DropSelected = 1;
 	  break;
@@ -2065,6 +2071,7 @@ ProcessUserInput (void)
 	case 'U':		// use grid now
 	  cmdMate ("AC", "1", __LINE__);
           LE_PWM.resolution=PWM_ONGRID_RESOLUTION;
+          UE_PWM.resolution=PWM_ONGRID_RESOLUTION;
 	case 'u':		// set use grid flag
 	  DropSelected = 0;	//default
 	  break;
@@ -2365,7 +2372,7 @@ PI_THREAD (pulseWell)
 
 PI_THREAD (togglePin)
 {
-  const int CycleMicroSec = 8195;
+  const int CycleMicroSec = 8180;
 
   while (1)
     {
