@@ -116,7 +116,7 @@
 #define L2_BUY_AMPS			(data[INVERT_INDX][11])	//BufInt(INVERTER_START+37,2)
 #define L1_SELL_AMPS		(data[INVERT_INDX][5])	//BufInt(INVERTER_START+16,2)
 #define L2_SELL_AMPS		(data[INVERT_INDX][12])	//BufInt(INVERTER_START+40,2)
-#define TOT_LOAD(LEG)		(((LEG##_BUY_AMPS) + (LEG##_INVERTER_AMPS))) /*- LEG##_CHARGER_AMPS)*/
+#define TOT_LOAD(LEG)		(((LEG##_BUY_AMPS) + (LEG##_INVERTER_AMPS) - (LEG##_SELL_AMPS))) /*- LEG##_CHARGER_AMPS)*/
 #define INVERTERVOLTS		(((float)(data[INVERT_INDX][19]))/10.0)	//((float)BufInt(INVERTER_START+65,3)/10)
 #define CC1_AHA				(data[CC1_INDX][12])	//BufInt(CC1_START+41,4)
 #define CC1_KWHH			(((float)(data[CC1_INDX][6]))/10.0)	//((float)BufInt(CC1_START+20,4)/10)

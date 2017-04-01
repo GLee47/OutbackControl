@@ -454,12 +454,12 @@ void
 WHpowerLevel (int OnHigh)
 {
   int state = digitalRead (WH_LOWER_ELEMENT);
-  int percent=LE_PWM.percent;
+  int percent = LE_PWM.percent;
 
   if (state)
     {
       digitalWrite (WH_LOWER_ELEMENT, 0);
-      LE_PWM.percent=0;
+      LE_PWM.percent = 0;
       usleep (17000);
     }
   if (OnHigh)
@@ -472,7 +472,7 @@ WHpowerLevel (int OnHigh)
     }
   if (state)
     usleep (50000);
-  LE_PWM.percent=percent;
+  LE_PWM.percent = percent;
   digitalWrite (WH_LOWER_ELEMENT, state);
 }
 
@@ -1492,8 +1492,8 @@ ControlGridTieUse (void)
 	  if (tmr++ > 30)
 	    {
 	      cmdMate ("AC", "0", __LINE__);
-	      LE_PWM.resolution=PWM_OFFGRID_RESOLUTION;
-	      UE_PWM.resolution=PWM_OFFGRID_RESOLUTION;
+	      LE_PWM.resolution = PWM_OFFGRID_RESOLUTION;
+	      UE_PWM.resolution = PWM_OFFGRID_RESOLUTION;
 	      ADJ_SELLV (SellVoltMin);
 	      tmr = 0;
 	      GTpause = 3;
@@ -1945,8 +1945,8 @@ ProcessUserInput (void)
 	  break;
 	case 'D':		// drop grid now and allow grid tie function to drop
 	  cmdMate ("AC", "0", __LINE__);
-	  LE_PWM.resolution=PWM_OFFGRID_RESOLUTION;
-          UE_PWM.resolution=PWM_OFFGRID_RESOLUTION;
+	  LE_PWM.resolution = PWM_OFFGRID_RESOLUTION;
+	  UE_PWM.resolution = PWM_OFFGRID_RESOLUTION;
 	case 'd':		// allow grid tie function to drop
 	  DropSelected = 1;
 	  break;
@@ -2070,8 +2070,8 @@ ProcessUserInput (void)
 	  break;
 	case 'U':		// use grid now
 	  cmdMate ("AC", "1", __LINE__);
-          LE_PWM.resolution=PWM_ONGRID_RESOLUTION;
-          UE_PWM.resolution=PWM_ONGRID_RESOLUTION;
+	  LE_PWM.resolution = PWM_ONGRID_RESOLUTION;
+	  UE_PWM.resolution = PWM_ONGRID_RESOLUTION;
 	case 'u':		// set use grid flag
 	  DropSelected = 0;	//default
 	  break;
@@ -2362,9 +2362,9 @@ PI_THREAD (pulseWell)
 	{
 	  digitalWrite (COMPRESSOR_CTRL_PIN, 0);
 	}
-      delayMicroseconds (PULSE_WELL_ON_MICROS /*1050000*/);
+      delayMicroseconds (PULSE_WELL_ON_MICROS /*1050000 */ );
       digitalWrite (COMPRESSOR_CTRL_PIN, 0);
-      delayMicroseconds (PULSE_WELL_OFF_MICROS /*350000*/);
+      delayMicroseconds (PULSE_WELL_OFF_MICROS /*350000 */ );
     }
 }
 
