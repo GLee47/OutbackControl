@@ -132,9 +132,9 @@ float SellWH,
   netbattamps = 0.0,
   BatTrgAmp = 0.0, MaxNegBatAmpsDropped = (-MAX_NEG_NBA_DROPPED);
 float DaysSinceFull = 999.9;
-float WHtopMaxTemp = 190.1,
+float WHtopMaxTemp = 196.1,
   WHtopMinTemp = 100.0,
-  WHCenterMinTemp = 50.0, WHmaxAnyTemp = 193.0, WhLEGridGoal = 50.0;
+  WHCenterMinTemp = 50.0, WHmaxAnyTemp = 198.0, WhLEGridGoal = 50.0;
 
 float MC_On_Temp = MR_COOL_ON_TEMP_DEFAULT,
   MC_Off_Temp = MR_COOL_OFF_TEMP_DEFAULT;
