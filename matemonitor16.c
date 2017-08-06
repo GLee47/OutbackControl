@@ -553,6 +553,50 @@ SaveStats (float Volts, int SOC)
     }
 }
 
+void
+SaveTemps ()
+{
+  sqlite3_stmt *stmt;
+  char sql[4096];
+  if (!EnableSystem)
+    return;
+  sprintf (sql,
+	   "INSERT INTO temps values(julianday('now'),%f,%f,%f,%f,%f,%f,%f,%f)",
+	   readSensorF (2, 666.6), readSensorF (4, 666.6), readSensorF (0,
+									666.6),
+	   readSensorF (5, 666.6), readSensorF (6, 666.6), FNDC_BATT_TEMP,
+	   readSensorF (3, 666.6), readSensorF (7, 666.6) );
+  if (sqlite3_prepare_v2 (MMDb, sql, strlen (sql) + 1, &stmt, NULL) ==
+      SQLITE_OK)
+    {
+      if (sqlite3_step (stmt) == SQLITE_DONE);
+	{
+	  //success
+	}
+      sqlite3_finalize (stmt);
+    }
+}
+
+void
+SaveDaily (float Sold, float WH, long Gen, long Pump)
+{
+  sqlite3_stmt *stmt;
+  char sql[4096];
+  if (!EnableSystem)
+    return;
+  sprintf (sql, "INSERT INTO daily values(julianday('now'),%f,%f,%ld,%ld)",
+	   Sold, WH, Gen, Pump);
+  if (sqlite3_prepare_v2 (MMDb, sql, strlen (sql) + 1, &stmt, NULL) ==
+      SQLITE_OK)
+    {
+      if (sqlite3_step (stmt) == SQLITE_DONE);
+      {
+	//success
+      }
+      sqlite3_finalize (stmt);
+    }
+}
+
 int
 sendmail (const char *to, const char *from, const char *subject,
 	  const char *message)
@@ -686,7 +730,7 @@ TimeEvents (void)
       InvChrgEnabled = NO;
       logMesg ("Turning charger off at %d:%d\n", hour, minute);
     }
-  if ((tm_p->tm_mday == 32) && (hour >= 10))
+  if ((tm_p->tm_mday == 4) && (hour >= 14))
     vacation = FALSE;
   if (vacation == FALSE)
     {
@@ -704,7 +748,7 @@ TimeEvents (void)
 	      if (InvInputMode == GridTied)
 		{
 		  MaxNegBatAmpsDropped = (-40);
-		  SetSellVmin (504, __LINE__);
+		  SetSellVmin (520, __LINE__);
 		}
 	      SEND_SMS_STAT_RPT;
 	    }
@@ -719,7 +763,7 @@ TimeEvents (void)
 	  if (TimeTest (8, 1, 0))
 	    {
 	      BathDone = FALSE;
-	      DropSelected = 1;
+	      //DropSelected = 1;
 	    }
 	  break;
 	case 10:
@@ -812,7 +856,7 @@ TimeEvents (void)
 	  if ((TimeTest (17, 30, 0)) && (InvInputMode == GridTied))
 	    {
 	      MaxNegBatAmpsDropped = (-4);
-	      DropSelected = 0;
+	      //DropSelected = 0;
 	      if (SellVoltMin < 540)
 		SetSellVmin (540, __LINE__);
 	      if (sellv < 540)
@@ -825,7 +869,7 @@ TimeEvents (void)
 	  if ((TimeTest (18, 0, 0)) && (InvInputMode == GridTied))
 	    {
 	      MaxNegBatAmpsDropped = (-4);
-	      DropSelected = 0;
+	      //DropSelected = 0;
 	      if (SellVoltMin < 560)
 		SetSellVmin (560, __LINE__);
 	      if (sellv < 560)
@@ -963,6 +1007,7 @@ TimeEvents (void)
   if (TimeTest (-1, 0, 0))
     {
       SaveStats ((AvHrVolts / c), (int) (AvHrSOC / c));
+      SaveTemps ();
       c = 0;
       AvHrSOC = 0;
       AvHrVolts = 0.0;
@@ -970,6 +1015,7 @@ TimeEvents (void)
 //11:59:59PM
   if (TimeTest (0, 0, 0))
     {
+      SaveDaily (SellWH, WaterHeaterKWH, CwattHoursGen, CwattHoursPump);
       SOCstart = FNDC_SOC;
       PowerOutageSecs = 0;
       BuyWH = 0;

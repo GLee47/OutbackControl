@@ -237,7 +237,7 @@ loadShed (void)
 	  logMesg ("LC @ %d  ACPS %s NTSAL1 %d EL1A %d\n", __LINE__,
 		   acpsModeDesc[AirCondPwrSrc], NeedToShedAmpsL1, EstL1A);
 	}
-      if ((NeedToShedAmpsL1 > 3) && (compressor (ASK) != 0))	//compressor is ok to run -- switch off
+      if ((NeedToShedAmpsL1 > 13) && (compressor (ASK) != 0))	//compressor is ok to run -- switch off change bak to 3 when aux pump is protected
 	{
 	  compressor (OFF);
 	  logMesg ("LC @ %d\n", __LINE__);
