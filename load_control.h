@@ -3,7 +3,7 @@
 #ifndef __load_control_h__
 
 #define __load_control_h__
-#define	MAX_LOAD_AMPS		33
+#define	MAX_LOAD_AMPS		36
 #define LOWER_HV_L1_DIFF	20
 #define LOWER_HV_L2_DIFF	10
 #define LOWER_LV_L2_DIFF	10

@@ -779,8 +779,8 @@ TimeEvents (void)
 	  break;
 	case 12:
 	  break;
-	case 15:
-	  if (TimeTest (15, 0, 0) && (FNDC_SOC < 93)
+	case 14:
+	  if (TimeTest (14, 0, 0) && (FNDC_SOC < 93)
 	      && (InvInputMode == GridTied))
 	    {
 	      if (sellv < 516)
@@ -797,12 +797,12 @@ TimeEvents (void)
 		  MaxNegBatAmpsDropped = (-30);
 		}
 	    }
-	  if (TimeTest (15, 30, 0) && (BathDone == FALSE)
+	  if (TimeTest (14, 30, 0) && (BathDone == FALSE)
 	      && (WHtopMinTemp < 125.0))
 	    WHtopMinTemp = 125.0;
 	  break;
-	case 16:
-	  if (TimeTest (16, 0, 0) && (FNDC_SOC < 98)
+	case 15:
+	  if (TimeTest (15, 0, 0) && (FNDC_SOC < 98)
 	      && (InvInputMode == GridTied))
 	    {
 	      if (sellv < 520)
@@ -819,7 +819,7 @@ TimeEvents (void)
 		  MaxNegBatAmpsDropped = (-25);
 		}
 	    }
-	  if (TimeTest (16, 15, 0))
+	  if (TimeTest (15, 15, 0))
 	    {
 	      SEND_SMS_STAT_RPT;
 	      if (BathDone == FALSE)
@@ -831,8 +831,8 @@ TimeEvents (void)
 		}
 	    }
 	  break;
-	case 17:
-	  if (TimeTest (17, 0, 0) && (FNDC_SOC < 99)
+	case 16:
+	  if (TimeTest (16, 0, 0) && (FNDC_SOC < 99)
 	      && (InvInputMode == GridTied))
 	    {
 	      if (sellv < 540)
@@ -849,11 +849,11 @@ TimeEvents (void)
 		  MaxNegBatAmpsDropped = (-20);
 		}
 	    }
-	  if (TimeTest (17, 15, 0))
+	  if (TimeTest (16, 15, 0))
 	    {
 	      SEND_SMS_STAT_RPT;
 	    }
-	  if ((TimeTest (17, 30, 0)) && (InvInputMode == GridTied))
+	  if ((TimeTest (16, 30, 0)) && (InvInputMode == GridTied))
 	    {
 	      MaxNegBatAmpsDropped = (-4);
 	      //DropSelected = 0;
@@ -865,8 +865,8 @@ TimeEvents (void)
 		  sellv = 540;
 		}
 	    }
-	case 18:
-	  if ((TimeTest (18, 0, 0)) && (InvInputMode == GridTied))
+	case 17:
+	  if ((TimeTest (17, 0, 0)) && (InvInputMode == GridTied))
 	    {
 	      MaxNegBatAmpsDropped = (-4);
 	      //DropSelected = 0;
@@ -878,7 +878,7 @@ TimeEvents (void)
 		  sellv = 560;
 		}
 	    }
-	  if (TimeTest (18, 45, 0))
+	  if (TimeTest (17, 45, 0))
 	    {
 	      if (BathDone == FALSE)
 		{
