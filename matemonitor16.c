@@ -134,7 +134,7 @@ float SellWH,
 float DaysSinceFull = 999.9;
 float WHtopMaxTemp = 196.1,
   WHtopMinTemp = 100.0,
-  WHCenterMinTemp = 50.0, WHmaxAnyTemp = 198.0, WhLEGridGoal = 50.0;
+  WHCenterMinTemp = 50.0, WHmaxAnyTemp = 194.0, WhLEGridGoal = 50.0;
 
 float MC_On_Temp = MR_COOL_ON_TEMP_DEFAULT,
   MC_Off_Temp = MR_COOL_OFF_TEMP_DEFAULT;
@@ -857,12 +857,12 @@ TimeEvents (void)
 	    {
 	      MaxNegBatAmpsDropped = (-4);
 	      //DropSelected = 0;
-	      if (SellVoltMin < 540)
-		SetSellVmin (540, __LINE__);
-	      if (sellv < 540)
+	      if (SellVoltMin < 560)
+		SetSellVmin (560, __LINE__);
+	      if (sellv < 560)
 		{
-		  cmdMate ("SELLV", "540", __LINE__);
-		  sellv = 540;
+		  cmdMate ("SELLV", "560", __LINE__);
+		  sellv = 560;
 		}
 	    }
 	case 17:
@@ -2249,6 +2249,7 @@ ProcessUserInput (void)
 	  break;
 	case '/':
 	  airJordanManOff = FALSE;
+          digitalWrite (AIR_JORDAN_SRC_PIN, 1);
 	  break;
 	}
     }
@@ -2409,7 +2410,7 @@ PI_THREAD (pulseWell)
 	  digitalWrite (COMPRESSOR_CTRL_PIN, 0);
 	}
       delayMicroseconds (PULSE_WELL_ON_MICROS /*1050000 */ );
-      digitalWrite (COMPRESSOR_CTRL_PIN, 0);
+//      digitalWrite (COMPRESSOR_CTRL_PIN, 0);
       delayMicroseconds (PULSE_WELL_OFF_MICROS /*350000 */ );
     }
 }

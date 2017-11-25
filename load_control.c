@@ -182,10 +182,10 @@ AirJorPrefered (int desired)	//1 for on, 0 for off, -1 for immediate off (regurd
       time (&AirJordanSwitchTime);
       return desired;
     }
-  if (difftime (time (NULL), AirJordanSwitchTime) > 300)
+  if (difftime (time (NULL), AirJordanSwitchTime) > 3) //3 sec is low because no compressor is affected at this time.
     {
       if (((desired == 1) && ((TOT_LOAD (L1) + AIR_COND_AMPS) < MAX_LOAD_AMPS)
-	   && ((TOT_LOAD (L2) + AIR_COND_AMPS) < MAX_LOAD_AMPS)
+//	   && ((TOT_LOAD (L2) + AIR_COND_AMPS) < MAX_LOAD_AMPS)
 	   && ((TEMPSENSOR (TOP) > 120.0)
 	       || ((UE_PWM.percent > 80) && LE_IS_ON) || (vacation == TRUE)
 	       || ((INVERTER_AC_MODE == iacmUse)
