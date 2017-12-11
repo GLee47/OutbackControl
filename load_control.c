@@ -20,6 +20,7 @@ extern enum AirCondPwrSrcModes AirCondPwrSrc;
 extern int airJordanManOff;
 extern void cmdMate (char *cmd, char *v, int ibookmark);
 extern void AlterCurrentLimit (int NewLimit, int ibookmark, int direction);
+extern float MC_On_Temp;
 
 #define VACATION_VSET		55
 #define LE_SETPOINT_START	120
@@ -126,7 +127,7 @@ setACPS (enum AirCondPwrSrcModes newMode)
 	  || ((newMode == acpsOn) && (AirCondPwrSrc != acpsNone)));
 }
 
-#define MIN_SECS_BETWEEN_CHANGES	300.0
+#define MIN_SECS_BETWEEN_CHANGES	10.0
 #define ACC_ON_NOW	3
 #define ACC_OFF_NOW	2
 
@@ -141,7 +142,7 @@ airCondControl (int targetState)
     {
       if ((targetState == ON) || (targetState == ACC_ON_NOW))	//ON=turn On if time has elapsed /3 means now
 	{
-	  if (digitalRead (AIR_COND_GPIO_PIN) == OFF)
+	  if ((digitalRead (AIR_COND_GPIO_PIN) == OFF) && (readSensorF(3,666)<MC_On_Temp))
 	    {
 	      digitalWrite (AIR_COND_GPIO_PIN, ON);
 	      time (&tChangeTime);

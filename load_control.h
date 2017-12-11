@@ -12,7 +12,7 @@
 #define UPPER_L2_DIFF		0
 #define COMPRESSOR_L1_DIFF	11
 #define COMPRESSOR_L2_DIFF	0
-#define AIR_COND_AMPS		7
+#define AIR_COND_AMPS		12
 	
 	enum AirCondPwrSrcModes{acpsGrid,acpsInverter,acpsNone,acpsOn};
 	void LoadControl(void);

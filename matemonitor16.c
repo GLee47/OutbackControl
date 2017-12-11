@@ -1700,6 +1700,21 @@ think (void)
   if (FNDC_EXTRADATAID == 6)
     DaysSinceFull = ((float) FNDC_EXTRADATA / 10.0);
 //need to make this play well with other logic  if (vacation!=TRUE) mrCool();  
+  if (preferHeatPumpOn)
+  {
+	if (MC_On_Temp>readSensorF(3,666)/*Control Room Temp*/)
+	{
+		airCondControl(1);
+	}
+	else
+	{
+		airCondControl(0);
+	}
+   }
+   else
+   {
+	airCondControl(0);
+   }
   if (WhLEGridGoal < readSensorF (4, 666.6))
     wh_le_src = INVERTER;
   digitalWrite (WH_LOWER_ELEMENT_SRC, wh_le_src);
