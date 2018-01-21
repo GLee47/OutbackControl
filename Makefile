@@ -1,5 +1,5 @@
-matemonitor: matemonitor16.c load_control.o gdlTimer.o outback.h usb_arduino.h SMS.o wh.o usb_com.o usb_arduino.o
-	gcc -Wall -o matemonitor -lwiringPi -lpanel -lncurses -ldl -lsqlite3 matemonitor16.c wh.o gdlTimer.o SMS.o usb_com.o usb_arduino.o load_control.o
+matemonitor: matemonitor17.c load_control.o gdlTimer.o outback.h usb_arduino.h SMS.o wh.o usb_com.o usb_arduino.o
+	gcc -Wall -o matemonitor -lwiringPi -lpanel -lncurses -ldl -lsqlite3 matemonitor17.c wh.o gdlTimer.o SMS.o usb_com.o usb_arduino.o load_control.o
 
 load_control.o:load_control.c load_control.h outback.h usb_arduino.h
 	gcc -c -Wall load_control.c
