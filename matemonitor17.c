@@ -25,7 +25,7 @@
 #include <wiringPi.h>
 #include <softPwm.h>
 #include "load_control.h"
-
+int iFifo;
 //these need to be an include file for wh.c
 enum whSwitch
 { whsOff, whsOn, whsUnset, whsInquiry };
@@ -132,9 +132,9 @@ float SellWH,
   netbattamps = 0.0,
   BatTrgAmp = 0.0, MaxNegBatAmpsDropped = (-MAX_NEG_NBA_DROPPED);
 float DaysSinceFull = 999.9;
-float WHtopMaxTemp = 196.1,
+float WHtopMaxTemp = 185.1,
   WHtopMinTemp = 100.0,
-  WHCenterMinTemp = 50.0, WHmaxAnyTemp = 194.0, WhLEGridGoal = 50.0;
+  WHCenterMinTemp = 50.0, WHmaxAnyTemp = 185.0, WhLEGridGoal = 50.0;
 
 float MC_On_Temp = MR_COOL_ON_TEMP_DEFAULT,
   MC_Off_Temp = MR_COOL_OFF_TEMP_DEFAULT;
@@ -565,14 +565,14 @@ SaveTemps ()
 	   readSensorF (2, 666.6), readSensorF (4, 666.6), readSensorF (0,
 									666.6),
 	   readSensorF (5, 666.6), readSensorF (6, 666.6), FNDC_BATT_TEMP,
-	   readSensorF (3, 666.6), readSensorF (7, 666.6) );
+	   readSensorF (3, 666.6), readSensorF (7, 666.6));
   if (sqlite3_prepare_v2 (MMDb, sql, strlen (sql) + 1, &stmt, NULL) ==
       SQLITE_OK)
     {
       if (sqlite3_step (stmt) == SQLITE_DONE);
-	{
-	  //success
-	}
+      {
+	//success
+      }
       sqlite3_finalize (stmt);
     }
 }
@@ -739,16 +739,16 @@ TimeEvents (void)
 	case 5:
 	  if (TimeTest (5, 30, 0))
 	    AmpsBelowThresholdWaitSecs = 25;
-            if (InvInputMode == GridTied)
-              {
-	            sellv=532;
-		    SetSellVmin (532, __LINE__);
-               }
-           BathDone=FALSE;
-           break;
-//	  if (TimeTest (5, 45, 0))
-//	    if (WHtopMinTemp < 115.0)
-//	      WHtopMinTemp = 115.0;
+	  if ((InvInputMode == GridTied) && (SellVoltMin < 532))
+	    {
+	      sellv = 532;
+	      SetSellVmin (532, __LINE__);
+	    }
+	  BathDone = FALSE;
+	  break;
+//        if (TimeTest (5, 45, 0))
+//          if (WHtopMinTemp < 115.0)
+//            WHtopMinTemp = 115.0;
 	case 7:
 	  if (TimeTest (7, 0, 0))
 	    {
@@ -761,15 +761,19 @@ TimeEvents (void)
 	    }
 	  if (TimeTest (7, 15, 0))
 	    {
-	      if (WHtopMinTemp < 115.0)
-		WHtopMinTemp = 115.0;
+	      if (BathDone == FALSE)
+		{
+
+		  if (WHtopMinTemp < 115.0)
+		    WHtopMinTemp = 115.0;
+		}
 	    }
 	  break;
 	case 8:
 
 	  if (TimeTest (8, 1, 0))
 	    {
-//	      BathDone = FALSE;
+//            BathDone = FALSE;
 	      //DropSelected = 1;
 	    }
 	  break;
@@ -779,7 +783,7 @@ TimeEvents (void)
 	      AmpsBelowThresholdWaitSecs = 5;
 	      SEND_SMS_STAT_RPT;
 	    }
-          break;
+	  break;
 	case 11:
 	  if (TimeTest (11, 50, 0) && (BathDone == FALSE)
 	      && (WHtopMinTemp < 120.0))
@@ -794,7 +798,8 @@ TimeEvents (void)
 	      if (sellv < 540)
 		{
 		  cmdMate ("SELLV", "540", __LINE__);
-		  if (sellv < 540) sellv = 540;
+		  if (sellv < 540)
+		    sellv = 540;
 		}
 	      if (SellVoltMin < 540)
 		{
@@ -873,7 +878,7 @@ TimeEvents (void)
 		  sellv = 560;
 		}
 	    }
-           break;
+	  break;
 	case 17:
 	  if ((TimeTest (17, 0, 0)) && (InvInputMode == GridTied))
 	    {
@@ -1710,20 +1715,20 @@ think (void)
     DaysSinceFull = ((float) FNDC_EXTRADATA / 10.0);
 //need to make this play well with other logic  if (vacation!=TRUE) mrCool();  
   if (preferHeatPumpOn)
-  {
-	if (MC_On_Temp>readSensorF(3,666)/*Control Room Temp*/)
+    {
+      if (MC_On_Temp > readSensorF (3, 666) /*Control Room Temp */ )
 	{
-		airCondControl(1);
+	  airCondControl (1);
 	}
-	else
+      else
 	{
-		airCondControl(0);
+	  airCondControl (0);
 	}
-   }
-   else
-   {
-	airCondControl(0);
-   }
+    }
+  else
+    {
+      airCondControl (0);
+    }
   if (WhLEGridGoal < readSensorF (4, 666.6))
     wh_le_src = INVERTER;
   digitalWrite (WH_LOWER_ELEMENT_SRC, wh_le_src);
@@ -1961,7 +1966,18 @@ ProcessAccumulators (void)
 void
 ProcessUserInput (void)
 {
-  while ((ch = getch ()) != ERR)
+	char fifoBuf[512];
+	int bytesRead;
+/*	if ((bytesRead=read(iFifo,fifoBuf,256))>0){
+		fifoBuf[bytesRead+1]=0;
+		logMesg(fifoBuf);
+		}*/
+  ch=getch();
+  if (ch==ERR){
+	   bytesRead=read(iFifo,fifoBuf,1);
+	   if((bytesRead>0) && (fifoBuf[0]!='\n')) ch=fifoBuf[0];
+	 }
+  while (ch != ERR)
     {
       POAlarm (2);
       if (ch == '^')
@@ -2273,9 +2289,10 @@ ProcessUserInput (void)
 	  break;
 	case '/':
 	  airJordanManOff = FALSE;
-          digitalWrite (AIR_JORDAN_SRC_PIN, 1);
+	  digitalWrite (AIR_JORDAN_SRC_PIN, 1);
 	  break;
 	}
+	ch=getch();
     }
 }
 
@@ -2420,7 +2437,40 @@ signalIntHandler (int signo)
   if (signo == SIGINT)
     terminate = true;
 }
+PI_THREAD (RemoteComm)
+{
+    int listenfd = 0, connfd = 0;
+    struct sockaddr_in serv_addr; 
 
+//    char sendBuff[1025];
+//    time_t ticks; 
+
+    listenfd = socket(AF_INET, SOCK_STREAM, 0);
+    memset(&serv_addr, '0', sizeof(serv_addr));
+//    memset(sendBuff, '0', sizeof(sendBuff)); 
+
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    serv_addr.sin_port = htons(5000); 
+
+    bind(listenfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)); 
+
+    listen(listenfd, 10); 
+
+    while(1)
+    {
+        connfd = accept(listenfd, (struct sockaddr*)NULL, NULL); 
+while(1){
+//        ticks = time(NULL);
+//        snprintf(sendBuff, sizeof(sendBuff), "BattV %3.1f Volts", INVERTERVOLTS);
+        write(connfd, data, sizeof(data)); //strlen to send strings instead of sizeof
+
+//        close(connfd);
+        sleep(1);
+        }
+     }
+	
+}
 PI_THREAD (pulseWell)
 {
   while (1)
@@ -2504,6 +2554,7 @@ main (int argc, char *argv[])
   LE_PWM.percent = 0;
   piThreadCreate (togglePin);
   piThreadCreate (pulseWell);
+  piThreadCreate (RemoteComm);
 /*	
 	fFIFO=fopen("/home/pi/projects/MateMonitor/testInput","r");
 	if(fFIFO==NULL)
@@ -2595,7 +2646,9 @@ main (int argc, char *argv[])
     }
   USB_init ();
   USBNano_init ();
-
+  iFifo=open("fifo",O_RDONLY | O_NONBLOCK);
+  
+//scr_dump("/var/www/mm/virtual.dump");
 /* Read from the socket */
   do
     {
