@@ -730,7 +730,7 @@ TimeEvents (void)
       InvChrgEnabled = NO;
       logMesg ("Turning charger off at %d:%d\n", hour, minute);
     }
-  if ((tm_p->tm_mday == 4) && (hour >= 14))
+  if ((tm_p->tm_mday == 13) && (hour >= 11))
     vacation = FALSE;
   if (vacation == FALSE)
     {
@@ -775,6 +775,15 @@ TimeEvents (void)
 	    {
 //            BathDone = FALSE;
 	      //DropSelected = 1;
+	    }
+	  break;
+	case 9:
+	  if (TimeTest (9, 0, 0))
+	    {
+			airJordanManOff = FALSE;
+			digitalWrite (AIR_JORDAN_SRC_PIN, 1);
+			preferHeatPumpOn=TRUE;
+			airCondControl(3);
 	    }
 	  break;
 	case 10:
@@ -880,26 +889,39 @@ TimeEvents (void)
 	    }
 	  break;
 	case 17:
-	  if ((TimeTest (17, 0, 0)) && (InvInputMode == GridTied))
-	    {
-	      MaxNegBatAmpsDropped = (-4);
-	      //DropSelected = 0;
-	      if (SellVoltMin < 560)
-		SetSellVmin (560, __LINE__);
-	      if (sellv < 560)
-		{
-		  cmdMate ("SELLV", "560", __LINE__);
-		  sellv = 560;
-		}
+	  if (TimeTest (17, 0, 0)) 
+	  {
+/*		  	airJordanManOff = TRUE;
+			digitalWrite (AIR_JORDAN_SRC_PIN, 0);
+			if (tm_p->tm_mday < 13) preferHeatPumpOn=FALSE;*/
+		  if (InvInputMode == GridTied)
+			{
+				MaxNegBatAmpsDropped = (-4);
+				//DropSelected = 0;
+				if (SellVoltMin < 560)
+					SetSellVmin (560, __LINE__);
+				if (sellv < 560)
+				{
+					cmdMate ("SELLV", "560", __LINE__);
+					sellv = 560;
+				}
+			}
 	    }
 	  if (TimeTest (17, 45, 0))
 	    {
+		  	airJordanManOff = TRUE;
+			digitalWrite (AIR_JORDAN_SRC_PIN, 0);
+			if (tm_p->tm_mday < 13)
+			  { 
+				preferHeatPumpOn=FALSE;
+				airCondControl (2);
+			  }
 	      if (BathDone == FALSE)
-		{
-		  wh_le_src = GRID;
-		  WhLEGridGoal = 125.0;
-		  logMesg ("Lower WH element on grid\n");
-		}
+			{
+				wh_le_src = GRID;
+				WhLEGridGoal = 125.0;
+				logMesg ("Lower WH element on grid\n");
+			}
 	    }
 	  break;
 

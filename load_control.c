@@ -127,7 +127,7 @@ setACPS (enum AirCondPwrSrcModes newMode)
 	  || ((newMode == acpsOn) && (AirCondPwrSrc != acpsNone)));
 }
 
-#define MIN_SECS_BETWEEN_CHANGES	10.0
+#define MIN_SECS_BETWEEN_CHANGES	10
 #define ACC_ON_NOW	3
 #define ACC_OFF_NOW	2
 
@@ -177,13 +177,13 @@ AirJorPrefered (int desired)	//1 for on, 0 for off, -1 for immediate off (regurd
     }
   if ((AJ == desired) || ((desired == (-1)) && (AJ == 0)))
     return 0;
-  if ((desired == (-1)) && (difftime (time (NULL), AirJordanSwitchTime) > 5))
+  if ((desired == (-1)) && (difftime (time (NULL), AirJordanSwitchTime) > 30))
     {
       digitalWrite (AIR_JORDAN_SRC_PIN, OFF);
       time (&AirJordanSwitchTime);
       return desired;
     }
-  if (difftime (time (NULL), AirJordanSwitchTime) > 3) //3 sec is low because no compressor is affected at this time.
+  if (difftime (time (NULL), AirJordanSwitchTime) > 300) //3 sec is low because no compressor is affected at this time.
     {
       if (((desired == 1) && ((TOT_LOAD (L1) + AIR_COND_AMPS) < MAX_LOAD_AMPS)
 //	   && ((TOT_LOAD (L2) + AIR_COND_AMPS) < MAX_LOAD_AMPS)
@@ -617,7 +617,7 @@ LoadControl (void)
 	    {
 	      LE_UP;
 	      loadBalance = 0;
-	      lcDelay = DEFAULT_DELAY;
+	      lcDelay = 1 /*DEFAULT_DELAY*/;
 	      logMesg ("LC @ %d LE==%d %4.2f %4.2f %4.1fF\n", __LINE__,
 		       LE_PWM.percent, AFNDCV,
 		       MAX (50.8 +
@@ -635,7 +635,7 @@ LoadControl (void)
 	{
 	  //upper tank temp in range -- turn on upper element, set delay, and return
 	  UE_UP;
-	  lcDelay = DEFAULT_DELAY;
+	  lcDelay = 1/*DEFAULT_DELAY*/;
 	  logMesg ("LC @ %d UE at %d, %4.2f %4.2f\n", __LINE__,
 		   UE_PWM.percent, AFNDCV,
 		   MAX (51.2 +
@@ -818,7 +818,7 @@ LoadControl (void)
 	{
 	  //upper tank temp in range -- turn off upper element, set delay, and return
 	  UE_PWM.percent -= (100 / UE_PWM.resolution);
-	  lcDelay = DEFAULT_DELAY;
+	  lcDelay = 1/*DEFAULT_DELAY*/;
 	  logMesg ("LC @ %d UE_PWM.percent=%d %4.2f %4.2f\n", __LINE__,
 		   UE_PWM.percent, AFNDCV,
 		   MAX (51.2 +
@@ -852,7 +852,7 @@ LoadControl (void)
 	    {
 	      LEOFF;
 	    }
-	  lcDelay = DEFAULT_DELAY;
+	  lcDelay = 1 /*DEFAULT_DELAY*/;
 	  logMesg ("LC @ %d LE_PWM.percent==%d %4.2f %4.2f\n", __LINE__,
 		   LE_PWM.percent, AFNDCV,
 		   MAX (50.8 +
