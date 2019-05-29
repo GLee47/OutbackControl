@@ -99,7 +99,7 @@ int ProgramIndx = 0;
 unsigned long Ticks = 0 /*roughly = seconds since program comenced */ ,
   auxRelayOffTicks = 0;
 const float ArrayRatedWatts = 245.0 * 30.0,
-  BatRatedAmpHr = 225.0 /*rating */  * 1.0 /*# of strings */ ;
+  BatRatedAmpHr = 105.0 /*rating */  * 1.0 /*# of strings */ ;
 
 #define ADJNETBATTAMPS	(netbattamps*(225/BatRatedAmpHr))
 
@@ -134,7 +134,7 @@ float SellWH,
 float DaysSinceFull = 999.9;
 float WHtopMaxTemp = 185.1,
   WHtopMinTemp = 100.0,
-  WHCenterMinTemp = 50.0, WHmaxAnyTemp = 185.0, WhLEGridGoal = 50.0;
+  WHCenterMinTemp = 50.0, WHmaxAnyTemp = 175.0, WhLEGridGoal = 50.0;
 
 float MC_On_Temp = MR_COOL_ON_TEMP_DEFAULT,
   MC_Off_Temp = MR_COOL_OFF_TEMP_DEFAULT;
@@ -743,6 +743,7 @@ TimeEvents (void)
 	    {
 	      sellv = 532;
 	      SetSellVmin (532, __LINE__);
+              cmdMate ("SELLV", "532", __LINE__);
 	    }
 	  BathDone = FALSE;
 	  break;
@@ -780,7 +781,7 @@ TimeEvents (void)
 	case 9:
 	  if (TimeTest (9, 0, 0))
 	    {
-			airJordanManOff = FALSE;
+//			airJordanManOff = FALSE;
 			digitalWrite (AIR_JORDAN_SRC_PIN, 1);
 			preferHeatPumpOn=TRUE;
 			airCondControl(3);
@@ -800,8 +801,8 @@ TimeEvents (void)
 	  break;
 	case 12:
 	  break;
-	case 14:
-	  if (TimeTest (14, 0, 0) && (FNDC_SOC < 93)
+	case 13:
+	  if (TimeTest (13, 0, 0) && (FNDC_SOC < 93)
 	      && (InvInputMode == GridTied))
 	    {
 	      if (sellv < 540)
@@ -841,7 +842,7 @@ TimeEvents (void)
 		  MaxNegBatAmpsDropped = (-25);
 		}
 	    }
-	  if (TimeTest (15, 15, 0))
+	  if (TimeTest (15, 14, 0))
 	    {
 	      SEND_SMS_STAT_RPT;
 	      if (BathDone == FALSE)
@@ -871,10 +872,10 @@ TimeEvents (void)
 		  MaxNegBatAmpsDropped = (-20);
 		}
 	    }
-	  if (TimeTest (16, 15, 0))
+/*	  if (TimeTest (16, 15, 0))
 	    {
 	      SEND_SMS_STAT_RPT;
-	    }
+	    }*/
 	  if ((TimeTest (16, 30, 0)) && (InvInputMode == GridTied))
 	    {
 	      MaxNegBatAmpsDropped = (-4);
@@ -925,15 +926,15 @@ TimeEvents (void)
 	    }
 	  break;
 
-	case 19:
+	case 18:
 
-	  if (TimeTest (19, 15, 0))
+	  if (TimeTest (18, 15, 0))
 	    {
 	      wh_le_src = INVERTER;
 	      WhLEGridGoal = 50.0;
 	      logMesg ("Lower WH element on inverter\n");
 	    }
-	  if (TimeTest (19, 30, 0) && (InvInputMode == GridTied))
+	  if (TimeTest (18, 30, 0) && (InvInputMode == GridTied))
 	    {
 	      if (sellv > 528)
 		{
@@ -947,7 +948,7 @@ TimeEvents (void)
 	      MaxNegBatAmpsDropped = (0);
 	    }
 
-	  if (TimeTest (19, 15, 0))
+	  if (TimeTest (18, 15, 0))
 	    {
 	      if (WHCenterMinTemp > 110.0)
 		WHCenterMinTemp = 110.0;
@@ -1110,7 +1111,7 @@ PowerOutage (void)
   POAlarm (1);
   if (INVERTER_OP_MODE != INV_IS_OFF)	// inverter is on
     {
-      if ((FNDC_BATT_VOLTS < 44.0)
+      if ((FNDC_BATT_VOLTS < 42.0)
 	  || (FNDC_SOC < MIN (MAX ((PrgDataStruct.SOC_Targ), (50)), (80))
 	      && (InvIgnLowVolt == false)))
 	{
@@ -2269,7 +2270,7 @@ ProcessUserInput (void)
 	  digitalWrite (MRCOOL2KHP_PWR_GPIO, 1);
 	  break;
 	case '@':
-	  digitalWrite (MRCOOL2KHP_PWR_GPIO, 0);
+	  //digitalWrite (MRCOOL2KHP_PWR_GPIO, 0);
 	  break;
 	case '#':
 	  digitalWrite (MRCOOL2KHP_SRC_GPIO, 1);

@@ -86,7 +86,7 @@ setACPS (enum AirCondPwrSrcModes newMode)
   switch (newMode)
     {
     case acpsGrid:
-      digitalWrite (MRCOOL2KHP_PWR_GPIO, 0);
+      //digitalWrite (MRCOOL2KHP_PWR_GPIO, 0);
       digitalWrite (MRCOOL2KHP_SRC_GPIO, 0);
       break;
     case acpsInverter:
@@ -104,7 +104,7 @@ setACPS (enum AirCondPwrSrcModes newMode)
     case acpsNone:
       if (AirCondPwrSrc != acpsNone)
 	time (&acpsOffTime);
-      digitalWrite (MRCOOL2KHP_PWR_GPIO, 0);
+      //digitalWrite (MRCOOL2KHP_PWR_GPIO, 0);
       digitalWrite (MRCOOL2KHP_SRC_GPIO, 1);
       break;
     case acpsOn:
@@ -117,7 +117,7 @@ setACPS (enum AirCondPwrSrcModes newMode)
 	}
       else
 	{
-	  digitalWrite (MRCOOL2KHP_PWR_GPIO, 0);
+	  //digitalWrite (MRCOOL2KHP_PWR_GPIO, 0);
 	  digitalWrite (MRCOOL2KHP_SRC_GPIO, 0);
 	}
       break;

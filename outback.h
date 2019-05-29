@@ -62,16 +62,16 @@
 //#define UEOFF digitalWrite(WH_UPPER_ELEMENT,OFF)
 #define UEON		(UE_PWM.percent=100)
 #define UEOFF		(UE_PWM.percent=0)
-#define UE_DOWN		{UE_PWM.percent-=(100/MIN(MAX(1,UE_PWM.resolution),5));if(UE_PWM.percent<0)UE_PWM.percent=0;}
-#define UE_UP		{UE_PWM.percent+=(100/MIN(MAX(1,UE_PWM.resolution),5));if(UE_PWM.percent>100)UE_PWM.percent=100;}
+#define UE_DOWN		(UE_PWM.percent=0)//{UE_PWM.percent-=(100/MIN(MAX(1,UE_PWM.resolution),5));if(UE_PWM.percent<0)UE_PWM.percent=0;}
+#define UE_UP		(UE_PWM.percent=100)//{UE_PWM.percent+=(100/MIN(MAX(1,UE_PWM.resolution),5));if(UE_PWM.percent>100)UE_PWM.percent=100;}
 #define LE_IS_ON 	(LE_PWM.percent>0)	/*(digitalRead(WH_LOWER_ELEMENT)==ON) */
 #define LE_IS_ON_FULL 	(LE_PWM.percent>=100)
 #define LE_IS_HV	(digitalRead(WH_LOWER_ELEMENT_HV));
 #define LE_IS_OFF 	(LE_PWM.percent<=0)
 #define LEON		(LE_PWM.percent=100)
 #define LEOFF		(LE_PWM.percent=0)
-#define LE_DOWN		{LE_PWM.percent-=(100/MIN(MAX(1,LE_PWM.resolution),12));if(LE_PWM.percent<0)LE_PWM.percent=0;}
-#define LE_UP		{LE_PWM.percent+=(100/MIN(MAX(1,LE_PWM.resolution),12));if(LE_PWM.percent>100)LE_PWM.percent=100;}
+#define LE_DOWN		(LE_PWM.percent=0)//{LE_PWM.percent-=(100/MIN(MAX(1,LE_PWM.resolution),12));if(LE_PWM.percent<0)LE_PWM.percent=0;}
+#define LE_UP		(LE_PWM.percent=100)//{LE_PWM.percent+=(100/MIN(MAX(1,LE_PWM.resolution),12));if(LE_PWM.percent>100)LE_PWM.percent=100;}
 
 //#define MrHeatOffTemp                 71.5
 //#define MR_HEAT_ON_TEMP_DEFAULT       70.7    
