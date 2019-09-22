@@ -116,7 +116,8 @@ bool initilized = NO,
   BathDone = FALSE,
   wh_le_src = INVERTER,
   preferHeatPumpOn = FALSE,
-  InvChrgEnabled = NO, MateCommResponseExpected = NO, InvIgnLowVolt = false;
+  InvChrgEnabled = NO, InvChrgEmg = FALSE,
+  MateCommResponseExpected = NO, InvIgnLowVolt = false;
 int CurrentDay,
   DroppedSecs = 0, PowerOutageSecs = 0, UnderUtilizationSecs = 0;
 long IAO_Day_Secs, IAR_Day_Secs;
@@ -757,6 +758,7 @@ TimeEvents (void)
 		{
 		  MaxNegBatAmpsDropped = (-40);
 		  SetSellVmin (532, __LINE__);
+		  SetSellVmax (600, __LINE__);
 		}
 	      SEND_SMS_STAT_RPT;
 	    }
@@ -1797,6 +1799,19 @@ think (void)
   netbattamps =
     ((FNDC_SHUNT_A_AMPS) + (FNDC_SHUNT_B_AMPS) + (FNDC_SHUNT_C_AMPS));
   updateANBA ();
+  if (InvChrgEmg == FALSE)
+	{
+		if ((FNDC_BATT_VOLTS <= 45.0) && ((CC1_PVIV+CC2_PVIV)<90.0) && (INVERTER_OP_MODE==10))
+			{
+				char tbuff[32];
+				InvChrgEmg=TRUE;
+			    cmdMate ("CHG", "2", __LINE__);
+				cmdMate ("BULK", "1", __LINE__);
+				sprintf (tbuff, "%3d", 520);
+				cmdMate ("ABSORBV", tbuff, __LINE__);
+				logMesg ("Emergency charge invoked.\n");
+			}
+	}
   if (netbattamps > 0.0)
     {
       if ((FNDC_BATT_VOLTS <= 51.2)
@@ -2051,6 +2066,13 @@ ProcessUserInput (void)
 	      cmdMate ("CHG", "0", __LINE__);
 	      InvChrgEnabled = NO;	//default
 	    }
+	  if (InvChrgEmg == TRUE)
+		{
+			InvChrgEmg = FALSE;
+			cmdMate ("CHG", "0", __LINE__);
+			SetSellVmax (600, __LINE__);
+			logMesg ("Emergency charge canceled.\n");
+		}
 	  break;
 	case 'D':		// drop grid now and allow grid tie function to drop
 	  cmdMate ("AC", "0", __LINE__);
